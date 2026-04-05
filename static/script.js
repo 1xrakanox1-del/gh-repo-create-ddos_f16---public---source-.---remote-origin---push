@@ -369,33 +369,60 @@ function renderResults(moduleId) {
   output.innerHTML = html;
 }
 
-// ────── RENDERERS (original 11) ──────
+// ────── RENDERERS — MATCHED TO BACKEND OUTPUT ──────
 function renderDNS(data) {
   let h = '';
-  ['A','AAAA','MX','NS','TXT','CNAME','SOA','SRV','CAA'].forEach(t => {
-    if (data[t] && data[t].length > 0) {
+  // Backend returns data.records = { A: [...], AAAA: [...], ... }
+  const records = data.records || data;
+  ['A','AAAA','MX','NS','TXT','CNAME','SOA','SRV','CAA','PTR'].forEach(t => {
+    const recs = records[t] || data[t];
+    if (recs && recs.length > 0) {
       h += '\n<span class="line-key">  ┌─ [' + t + ']</span>\n';
-      data[t].forEach((r, i) => {
-        const pre = i === data[t].length - 1 ? '└' : '├';
+      recs.forEach((r, i) => {
+        const pre = i === recs.length - 1 ? '└' : '├';
         h += '  <span class="line-value">  ' + pre + '─ ' + escapeHtml(r) + '</span>\n';
       });
     }
   });
-  if (data._raw) h += '\n<span class="line-header">RAW OUTPUT</span>\n<span class="line-value">' + escapeHtml(data._raw) + '</span>\n';
+  // DNSSEC
+  if (data.dnssec) h += '\n<span class="line-key">  DNSSEC:</span> <span class="line-value">' + escapeHtml(data.dnssec) + '</span>\n';
+  // Zone Transfer
+  if (data.zone_transfer && Array.isArray(data.zone_transfer) && data.zone_transfer.length > 0) {
+    h += '\n<span class="line-header">  ZONE TRANSFER</span>\n';
+    data.zone_transfer.forEach(zt => {
+      const icon = zt.status === 'VULNERABLE' ? '⚠' : '✓';
+      const cls = zt.status === 'VULNERABLE' ? 'line-error' : 'badge-found';
+      h += '  <span class="' + cls + '">  ' + icon + ' ' + escapeHtml(zt.nameserver || '') + ' — ' + escapeHtml(zt.status || '') + '</span>\n';
+      if (zt.records_leaked) h += '    <span class="line-warn">  Records leaked: ' + zt.records_leaked + '</span>\n';
+    });
+  }
+  // Stats
+  if (data.stats) {
+    h += '\n<span class="line-key">  Total Records:</span> <span class="line-value">' + (data.stats.total_records || 0) + '</span>\n';
+    h += '<span class="line-key">  Types Found:</span>   <span class="line-value">' + (data.stats.types_found || 0) + '</span>\n';
+  }
   return h || '<span class="line-comment">  No DNS records found</span>';
 }
 
 function renderSubdomains(data) {
   let h = '';
-  const subs = data.subdomains || (Array.isArray(data) ? data : []);
+  // Backend returns data.all_subdomains (array of strings) + data.sources
+  const subs = data.all_subdomains || data.subdomains || (Array.isArray(data) ? data : []);
   if (subs.length > 0) {
     h += '<span class="badge-found">  ✓ Discovered ' + subs.length + ' subdomain(s)</span>\n';
-    if (data.sources) h += '<span class="line-comment">  Sources: ' + escapeHtml(JSON.stringify(data.sources)) + '</span>\n';
+    // Source stats
+    if (data.stats) {
+      h += '<span class="line-comment">  Sources: crt.sh(' + (data.stats.from_crt||0) + ') + bruteforce(' + (data.stats.from_bruteforce||0) + ') + archive(' + (data.stats.from_archive||0) + ')</span>\n';
+    }
     h += '\n';
+    // Show brute-force results with IPs first
+    const bruteResults = (data.sources && data.sources.dns_bruteforce) ? data.sources.dns_bruteforce.subdomains || [] : [];
+    const bruteMap = {};
+    bruteResults.forEach(b => { if (b.subdomain) bruteMap[b.subdomain] = b.ip; });
     subs.forEach((s, i) => {
       const num = String(i + 1).padStart(3, '0');
       const sub = typeof s === 'string' ? s : (s.subdomain || s);
-      const ip = typeof s === 'object' ? (s.ip || '') : '';
+      const ip = bruteMap[sub] || (typeof s === 'object' ? (s.ip || '') : '');
       h += '  <span class="line-key">[' + num + ']</span> <span class="line-value">' + escapeHtml(String(sub).padEnd(38)) + '</span>';
       if (ip) h += '<span class="badge-found"> → ' + escapeHtml(ip) + '</span>';
       h += '\n';
@@ -407,50 +434,188 @@ function renderSubdomains(data) {
 }
 
 function renderWhois(data) {
-  const text = data.data || (typeof data === 'string' ? data : JSON.stringify(data, null, 2));
-  return '<span class="line-value">' + escapeHtml(text).replace(/(Domain Name|Registrar|Creation Date|Updated Date|Registry Expiry Date|Registrant|Name Server|DNSSEC|Status)[:\s]/gi, '<span class="line-key">$1</span>: ') + '</span>';
+  let h = '';
+  // Backend returns data.whois = { registrar, creation_date, ... }
+  const w = data.whois || data;
+  if (w.error && !w.raw) {
+    return '<span class="line-error">  ' + escapeHtml(w.error) + '</span>';
+  }
+  if (w.raw) {
+    return '<span class="line-value">' + escapeHtml(w.raw).replace(/(Domain Name|Registrar|Creation Date|Updated Date|Registry Expiry Date|Registrant|Name Server|DNSSEC|Status)[:\s]/gi, '<span class="line-key">$1</span>: ') + '</span>';
+  }
+  const fields = [
+    ['Domain', w.domain_name], ['Registrar', w.registrar], ['Registrar URL', w.registrar_url],
+    ['Created', w.creation_date], ['Expires', w.expiration_date], ['Updated', w.updated_date],
+    ['Age (years)', w.domain_age_years], ['Expires in (days)', w.expires_in_days],
+    ['Registrant', w.registrant], ['Organization', w.org],
+    ['Country', w.country], ['State', w.state], ['City', w.city],
+    ['DNSSEC', w.dnssec]
+  ];
+  fields.forEach(([label, val]) => {
+    if (val !== undefined && val !== null && val !== 'Unknown' && val !== 'N/A' && val !== 'REDACTED') {
+      h += '<span class="line-key">  ' + label.padEnd(20) + '</span> <span class="line-value">' + escapeHtml(String(val)) + '</span>\n';
+    }
+  });
+  if (w.name_servers && w.name_servers.length) {
+    h += '\n<span class="line-header">  NAME SERVERS</span>\n';
+    w.name_servers.forEach(ns => { h += '  <span class="line-value">  ├─ ' + escapeHtml(ns) + '</span>\n'; });
+  }
+  if (w.emails && w.emails.length) {
+    h += '\n<span class="line-header">  CONTACT EMAILS</span>\n';
+    w.emails.forEach(e => { h += '  <span class="line-value">  ├─ ' + escapeHtml(e) + '</span>\n'; });
+  }
+  if (w.status && w.status.length) {
+    h += '\n<span class="line-header">  STATUS</span>\n';
+    (Array.isArray(w.status) ? w.status : [w.status]).forEach(s => { h += '  <span class="line-value">  ├─ ' + escapeHtml(s) + '</span>\n'; });
+  }
+  return h || renderGeneric(data);
 }
 
 function renderHeaders(data) {
   let h = '';
-  if (data.scheme) h += '<span class="line-key">  Protocol:</span> <span class="badge-found">' + data.scheme.toUpperCase() + '</span>\n\n';
-  if (data.headers) {
-    data.headers.split('\n').forEach(line => {
-      const parts = line.split(':');
-      if (parts.length >= 2) h += '<span class="line-key">  ' + escapeHtml(parts[0]) + ':</span> <span class="line-value">' + escapeHtml(parts.slice(1).join(':').trim()) + '</span>\n';
-      else if (line.trim()) h += '<span class="line-value">  ' + escapeHtml(line) + '</span>\n';
+  // Backend returns data.https = { status_code, server, all_headers, ... }, data.http = { ... }, data.redirects, data.cookies
+  ['https', 'http'].forEach(scheme => {
+    const info = data[scheme];
+    if (info && !info.error) {
+      h += '<span class="line-header">  ' + scheme.toUpperCase() + ' RESPONSE</span>\n';
+      h += '<span class="line-key">  Status:</span>          <span class="line-value">' + (info.status_code || 'N/A') + '</span>\n';
+      h += '<span class="line-key">  Response Time:</span>   <span class="line-value">' + (info.response_time_ms || '?') + ' ms</span>\n';
+      h += '<span class="line-key">  Server:</span>          <span class="badge-found">' + escapeHtml(info.server || 'Hidden') + '</span>\n';
+      h += '<span class="line-key">  Powered By:</span>      <span class="line-value">' + escapeHtml(info.powered_by || 'Hidden') + '</span>\n';
+      h += '<span class="line-key">  Content-Type:</span>    <span class="line-value">' + escapeHtml(info.content_type || '') + '</span>\n';
+      h += '<span class="line-key">  Content-Encoding:</span><span class="line-value"> ' + escapeHtml(info.content_encoding || 'None') + '</span>\n';
+      h += '<span class="line-key">  Cache-Control:</span>   <span class="line-value">' + escapeHtml(info.cache_control || 'None') + '</span>\n';
+      if (info.all_headers) {
+        h += '\n<span class="line-header">  ALL HEADERS</span>\n';
+        Object.entries(info.all_headers).forEach(([k, v]) => {
+          h += '  <span class="line-key">  ' + escapeHtml(k) + ':</span> <span class="line-value">' + escapeHtml(v) + '</span>\n';
+        });
+      }
+      h += '\n';
+    } else if (info && info.error) {
+      h += '<span class="line-key">  ' + scheme.toUpperCase() + ':</span> <span class="line-error">' + escapeHtml(info.error) + '</span>\n';
+    }
+  });
+  // Redirects
+  if (data.redirects && data.redirects.length > 0) {
+    h += '<span class="line-header">  REDIRECT CHAIN</span>\n';
+    data.redirects.forEach((r, i) => {
+      if (r.final_url) {
+        h += '  <span class="badge-found">  ✓ Final: ' + escapeHtml(r.final_url) + ' (' + r.final_code + ')</span>\n';
+      } else {
+        h += '  <span class="line-key">  [' + i + ']</span> <span class="line-value">' + escapeHtml(r.from || '') + ' → ' + escapeHtml(r.to || '') + ' (HTTP ' + (r.code || '') + ')</span>\n';
+      }
     });
   }
-  if (data.redirect_chain) {
-    h += '\n<span class="line-header">  REDIRECT CHAIN</span>\n';
-    data.redirect_chain.forEach((r, i) => h += '  <span class="line-key">  [' + i + ']</span> <span class="line-value">' + escapeHtml(r) + '</span>\n');
+  // Cookies
+  if (data.cookies && data.cookies.length > 0) {
+    h += '\n<span class="line-header">  COOKIES</span>\n';
+    data.cookies.forEach(c => {
+      h += '  <span class="line-value">  ├─ ' + escapeHtml(c.name || '') + ' (Secure: ' + (c.secure ? 'Yes' : 'No') + ', HttpOnly: ' + (c.httponly ? 'Yes' : 'No') + ')</span>\n';
+    });
   }
-  return h;
+  return h || renderGeneric(data);
 }
 
 function renderSSL(data) {
   let h = '';
-  if (data.expiry) h += '<span class="line-key">  Expiry:</span> <span class="line-value">' + escapeHtml(data.expiry) + '</span>\n\n';
-  if (data.certificate) {
-    h += '<span class="line-value">' + escapeHtml(data.certificate).replace(/(Issuer|Subject|Not Before|Not After|Serial Number|Signature Algorithm|Public Key Algorithm|DNS)[:\s]/g, '<span class="line-key">$1</span>: ') + '</span>';
+  // Backend: data.certificate = { subject, issuer, not_before, not_after, san, days_until_expiry, expired, ... }
+  // data.grade, data.score, data.protocols, data.current_cipher, data.tls_version, data.vulnerabilities
+  const cert = data.certificate || {};
+  if (cert.error) {
+    h += '<span class="line-error">  SSL Error: ' + escapeHtml(cert.error) + '</span>\n';
+  } else {
+    if (cert.subject) {
+      const cn = cert.subject.commonName || cert.subject.organizationName || '';
+      h += '<span class="line-key">  Common Name:</span>    <span class="line-value">' + escapeHtml(cn) + '</span>\n';
+    }
+    if (cert.issuer) {
+      const issuer = cert.issuer.organizationName || cert.issuer.commonName || '';
+      h += '<span class="line-key">  Issuer:</span>         <span class="line-value">' + escapeHtml(issuer) + '</span>\n';
+    }
+    h += '<span class="line-key">  Valid From:</span>     <span class="line-value">' + escapeHtml(cert.not_before || 'Unknown') + '</span>\n';
+    h += '<span class="line-key">  Valid Until:</span>    <span class="line-value">' + escapeHtml(cert.not_after || 'Unknown') + '</span>\n';
+    if (cert.days_until_expiry !== undefined) {
+      const cls = cert.expired ? 'line-error' : (cert.days_until_expiry < 30 ? 'line-warn' : 'badge-found');
+      h += '<span class="line-key">  Days Remaining:</span> <span class="' + cls + '">' + cert.days_until_expiry + (cert.expired ? ' (EXPIRED!)' : '') + '</span>\n';
+    }
+    if (cert.san && cert.san.length > 0) {
+      h += '\n<span class="line-header">  SUBJECT ALT NAMES (' + cert.san.length + ')</span>\n';
+      cert.san.slice(0, 15).forEach(s => { h += '  <span class="line-value">  ├─ ' + escapeHtml(s) + '</span>\n'; });
+      if (cert.san.length > 15) h += '  <span class="line-comment">  └─ ... and ' + (cert.san.length - 15) + ' more</span>\n';
+    }
   }
-  if (data.grade) h += '\n<span class="line-key">  Grade:</span> <span class="badge-grade grade-' + data.grade[0].toLowerCase() + '">' + escapeHtml(data.grade) + '</span>';
+  // Cipher & TLS
+  if (data.current_cipher) {
+    h += '\n<span class="line-key">  Cipher Suite:</span>   <span class="line-value">' + escapeHtml(data.current_cipher.name || '') + '</span>\n';
+    h += '<span class="line-key">  Cipher Bits:</span>    <span class="line-value">' + (data.current_cipher.bits || '') + '</span>\n';
+  }
+  if (data.tls_version) h += '<span class="line-key">  TLS Version:</span>    <span class="line-value">' + escapeHtml(data.tls_version) + '</span>\n';
+  // Protocols
+  if (data.protocols) {
+    h += '\n<span class="line-header">  PROTOCOL SUPPORT</span>\n';
+    Object.entries(data.protocols).forEach(([proto, supported]) => {
+      const icon = supported ? '✓' : '✗';
+      const cls = (proto === 'TLSv1.0' || proto === 'TLSv1.1') && supported ? 'line-error' : (supported ? 'badge-found' : 'line-comment');
+      h += '  <span class="' + cls + '">  ' + icon + ' ' + escapeHtml(proto) + '</span>\n';
+    });
+  }
+  // Vulnerabilities
+  if (data.vulnerabilities && data.vulnerabilities.length > 0) {
+    h += '\n<span class="line-header">  ⚠ VULNERABILITIES</span>\n';
+    data.vulnerabilities.forEach(v => {
+      h += '  <span class="line-error">  ⚠ ' + escapeHtml(v.name || '') + ' [' + escapeHtml(v.severity || '') + ']</span>\n';
+      if (v.detail) h += '    <span class="line-sub">' + escapeHtml(v.detail) + '</span>\n';
+    });
+  }
+  // Grade
+  if (data.grade) {
+    const gc = data.grade.startsWith('A') ? 'grade-a' : data.grade === 'B' ? 'grade-b' : data.grade === 'C' ? 'grade-c' : data.grade === 'D' ? 'grade-d' : 'grade-f';
+    h += '\n<span class="line-key">  Grade:</span> <span class="badge-grade ' + gc + '">' + escapeHtml(data.grade) + '</span>';
+    if (data.score !== undefined) h += ' <span class="line-value">(' + data.score + '/100)</span>';
+  }
   return h || '<span class="line-comment">  No SSL certificate data</span>';
 }
 
 function renderTech(data) {
   let h = '';
-  const techs = data.technologies || (Array.isArray(data) ? data : []);
-  if (techs.length > 0) {
-    h += '<span class="badge-found">  ✓ Detected ' + techs.length + ' technolog' + (techs.length > 1 ? 'ies' : 'y') + '</span>\n\n';
-    techs.forEach(tech => {
-      const name = typeof tech === 'string' ? tech : (tech.name || tech);
-      const cat = typeof tech === 'object' ? (tech.category || '') : '';
-      h += '  <span class="line-key">  ⬡</span> <span class="line-value">' + escapeHtml(name) + '</span>';
-      if (cat) h += ' <span class="line-comment">(' + escapeHtml(cat) + ')</span>';
-      h += '\n';
-    });
-  } else { h += '<span class="line-comment">  No technologies detected</span>'; }
+  // Backend returns data.technologies = { server: [...], cms: [...], framework: [...], javascript: [...], ... }
+  const techs = data.technologies || {};
+  if (typeof techs === 'object' && !Array.isArray(techs)) {
+    let totalCount = 0;
+    Object.values(techs).forEach(arr => { if (Array.isArray(arr)) totalCount += arr.length; });
+    if (totalCount > 0) {
+      h += '<span class="badge-found">  ✓ Detected ' + totalCount + ' technolog' + (totalCount > 1 ? 'ies' : 'y') + '</span>\n\n';
+      Object.entries(techs).forEach(([category, items]) => {
+        if (Array.isArray(items) && items.length > 0) {
+          h += '<span class="line-header">  ' + category.toUpperCase().replace('_', ' ') + '</span>\n';
+          items.forEach(item => {
+            h += '  <span class="line-key">  ⬡</span> <span class="line-value">' + escapeHtml(String(item)) + '</span>\n';
+          });
+          h += '\n';
+        }
+      });
+    } else {
+      h += '<span class="line-comment">  No technologies detected</span>';
+    }
+  } else if (Array.isArray(techs)) {
+    // Fallback for array format
+    if (techs.length > 0) {
+      h += '<span class="badge-found">  ✓ Detected ' + techs.length + ' technologies</span>\n\n';
+      techs.forEach(tech => {
+        const name = typeof tech === 'string' ? tech : (tech.name || JSON.stringify(tech));
+        h += '  <span class="line-key">  ⬡</span> <span class="line-value">' + escapeHtml(name) + '</span>\n';
+      });
+    } else {
+      h += '<span class="line-comment">  No technologies detected</span>';
+    }
+  } else {
+    h += '<span class="line-comment">  No technologies detected</span>';
+  }
+  if (data.stats) {
+    h += '\n<span class="line-key">  Total:</span>      <span class="line-value">' + (data.stats.total_technologies || 0) + '</span>\n';
+    h += '<span class="line-key">  Categories:</span>  <span class="line-value">' + (data.stats.categories || 0) + '</span>\n';
+  }
   return h;
 }
 
@@ -458,18 +623,24 @@ function renderPorts(data) {
   let h = '';
   if (data.ip) {
     h += '<span class="line-key">  Target IP:</span> <span class="line-value">' + escapeHtml(data.ip) + '</span>\n';
-    h += '<span class="line-key">  Scanned:</span>   <span class="line-value">' + (data.total_scanned || 30) + ' ports</span>\n\n';
+    h += '<span class="line-key">  Scanned:</span>   <span class="line-value">' + (data.stats ? data.stats.total_scanned : 40) + ' ports</span>\n\n';
   }
-  if (data.ports && data.ports.length > 0) {
-    h += '<span class="badge-found">  ✓ ' + data.ports.length + ' open port(s)</span>\n\n';
-    data.ports.forEach(p => {
+  // Backend returns data.open_ports (not data.ports)
+  const ports = data.open_ports || data.ports || [];
+  if (ports.length > 0) {
+    h += '<span class="badge-found">  ✓ ' + ports.length + ' open port(s)</span>\n\n';
+    ports.forEach(p => {
       h += '  <span class="line-key">  ⚡ ' + String(p.port).padEnd(8) + '</span>';
       h += '<span class="line-value">' + (p.service || '').padEnd(14) + '</span>';
-      h += '<span class="badge-open">' + (p.state || 'OPEN') + '</span>';
-      if (p.banner) h += ' <span class="line-comment">' + escapeHtml(p.banner) + '</span>';
+      h += '<span class="badge-open">' + (p.status || p.state || 'OPEN') + '</span>';
+      if (p.banner) h += ' <span class="line-comment">' + escapeHtml(p.banner.substring(0, 80)) + '</span>';
       h += '\n';
     });
   } else { h += '<span class="line-comment">  No open ports detected (firewall active)</span>'; }
+  if (data.stats && data.stats.risk_level) {
+    const cls = data.stats.risk_level === 'CRITICAL' || data.stats.risk_level === 'HIGH' ? 'line-error' : data.stats.risk_level === 'MEDIUM' ? 'line-warn' : 'badge-found';
+    h += '\n<span class="line-key">  Risk Level:</span> <span class="' + cls + '">' + data.stats.risk_level + '</span>\n';
+  }
   return h;
 }
 
@@ -480,16 +651,41 @@ function renderSecurity(data) {
     h += '<span class="line-key">  Security Score:</span> <span class="line-value">' + data.score + '/100</span>';
     h += ' <span class="badge-grade ' + gc + '">' + data.grade + '</span>\n\n';
   }
-  if (data.found && Object.keys(data.found).length > 0) {
-    h += '<span class="line-header">  ✓ PRESENT HEADERS</span>\n';
-    Object.entries(data.found).forEach(([k, v]) => {
-      h += '  <span class="badge-found">  ✓ ' + escapeHtml(k) + '</span>\n';
-      h += '    <span class="line-sub">' + escapeHtml(v) + '</span>\n';
+  // Backend returns data.headers = { HeaderName: { value, status, quality, description }, ... }
+  const hdrs = data.headers || data.found || {};
+  const present = [];
+  const missing = [];
+  const dangerous = [];
+  Object.entries(hdrs).forEach(([name, info]) => {
+    if (typeof info === 'object') {
+      if (info.status && info.status.includes('PRESENT')) present.push({ name, ...info });
+      else if (info.status && info.status.includes('MISSING')) missing.push({ name, ...info });
+      else if (info.status && info.status.includes('EXPOSED')) dangerous.push({ name, ...info });
+    }
+  });
+  if (present.length > 0) {
+    h += '<span class="line-header">  ✓ PRESENT HEADERS (' + present.length + ')</span>\n';
+    present.forEach(p => {
+      const qBadge = p.quality === 'STRONG' ? ' 🟢' : p.quality === 'WEAK' ? ' 🟡' : '';
+      h += '  <span class="badge-found">  ✓ ' + escapeHtml(p.name) + qBadge + '</span>\n';
+      if (p.value) h += '    <span class="line-sub">' + escapeHtml(String(p.value).substring(0, 150)) + '</span>\n';
     });
   }
-  if (data.missing && data.missing.length > 0) {
-    h += '\n<span class="line-header">  ✗ MISSING HEADERS</span>\n';
-    data.missing.forEach(mh => { h += '  <span class="badge-missing">  ✗ ' + escapeHtml(mh) + '</span>\n'; });
+  if (dangerous.length > 0) {
+    h += '\n<span class="line-header">  ⚠ INFORMATION LEAKAGE</span>\n';
+    dangerous.forEach(d => {
+      h += '  <span class="line-error">  ⚠ ' + escapeHtml(d.name) + ': ' + escapeHtml(String(d.value || '')) + '</span>\n';
+      if (d.description) h += '    <span class="line-sub">' + escapeHtml(d.description) + '</span>\n';
+    });
+  }
+  // Missing headers
+  const missingList = data.missing || missing.map(m => m.name);
+  if (missingList && missingList.length > 0) {
+    h += '\n<span class="line-header">  ✗ MISSING HEADERS (' + missingList.length + ')</span>\n';
+    missingList.forEach(mh => {
+      const name = typeof mh === 'string' ? mh : mh.name;
+      h += '  <span class="badge-missing">  ✗ ' + escapeHtml(name) + '</span>\n';
+    });
   }
   return h;
 }
@@ -498,165 +694,354 @@ function renderReverseDNS(data) {
   let h = '';
   h += '<span class="line-key">  Domain:</span>     <span class="line-value">' + escapeHtml(data.domain || '') + '</span>\n';
   h += '<span class="line-key">  IP Address:</span> <span class="line-value">' + escapeHtml(data.ip || '') + '</span>\n';
-  h += '<span class="line-key">  PTR Record:</span> <span class="line-value">' + escapeHtml(data.ptr || data.reverse || 'None') + '</span>\n';
+  // Backend returns data.ptr as array
+  const ptr = data.ptr || data.reverse || [];
+  if (Array.isArray(ptr)) {
+    h += '<span class="line-key">  PTR Record:</span> <span class="line-value">' + escapeHtml(ptr.join(', ') || 'None') + '</span>\n';
+  } else {
+    h += '<span class="line-key">  PTR Record:</span> <span class="line-value">' + escapeHtml(String(ptr)) + '</span>\n';
+  }
+  // Shared hosting
+  if (data.shared_domains && data.shared_domains.length > 0) {
+    h += '\n<span class="line-header">  SHARED HOSTING (' + data.shared_domains.length + ' domains on same IP)</span>\n';
+    data.shared_domains.slice(0, 50).forEach(d => {
+      h += '  <span class="line-value">  ├─ ' + escapeHtml(d) + '</span>\n';
+    });
+    if (data.shared_domains.length > 50) h += '  <span class="line-comment">  └─ ... and ' + (data.shared_domains.length - 50) + ' more</span>\n';
+  }
+  if (data.error) h += '<span class="line-error">  ' + escapeHtml(data.error) + '</span>\n';
   return h;
 }
 
 function renderGeo(data) {
   let h = '';
-  if (data.status === 'success' || data.country) {
-    [['Resolved IP', data.resolved_ip || data.query], ['Country', data.country], ['Region', data.regionName],
-     ['City', data.city], ['ZIP', data.zip], ['Latitude', data.lat], ['Longitude', data.lon],
-     ['Timezone', data.timezone], ['ISP', data.isp], ['Organization', data.org], ['AS Number', data.as]
-    ].forEach(([label, val]) => {
-      if (val !== undefined && val !== '') h += '<span class="line-key">  ' + label.padEnd(14) + '</span> <span class="line-value">' + escapeHtml(String(val)) + '</span>\n';
-    });
-  } else { h += '<span class="line-error">  Geolocation lookup failed</span>'; }
-  return h;
+  // Backend returns data.geo = { ip, continent, country, region, city, ... }
+  const geo = data.geo || data;
+  if (geo.error) {
+    return '<span class="line-error">  ' + escapeHtml(geo.error) + '</span>';
+  }
+  const fields = [
+    ['IP Address', geo.ip || data.ip],
+    ['Continent', geo.continent],
+    ['Country', geo.country],
+    ['Region', geo.region || geo.regionName],
+    ['City', geo.city],
+    ['ZIP', geo.zip],
+    ['Coordinates', geo.coordinates],
+    ['Timezone', geo.timezone],
+    ['ISP', geo.isp],
+    ['Organization', geo.organization || geo.org],
+    ['ASN', geo.asn],
+    ['ASN Name', geo.asn_name || geo.asname],
+    ['Reverse DNS', geo.reverse_dns],
+    ['Hostname', geo.hostname],
+    ['Is Proxy', geo.is_proxy],
+    ['Is Hosting', geo.is_hosting],
+    ['Is Mobile', geo.is_mobile],
+    ['Anycast', geo.anycast],
+  ];
+  fields.forEach(([label, val]) => {
+    if (val !== undefined && val !== null && val !== '' && val !== 'N/A' && val !== false && val !== 'Unknown') {
+      const display = typeof val === 'boolean' ? (val ? 'YES ⚠' : 'NO') : String(val);
+      h += '<span class="line-key">  ' + label.padEnd(16) + '</span> <span class="line-value">' + escapeHtml(display) + '</span>\n';
+    }
+  });
+  return h || '<span class="line-error">  Geolocation lookup failed</span>';
 }
 
 function renderRobots(data) {
   let h = '';
-  if (data['robots.txt']) { h += '<span class="line-header">  robots.txt</span>\n<span class="line-value">' + escapeHtml(data['robots.txt']) + '</span>\n'; }
-  if (data['sitemap.xml']) { h += '\n<span class="line-header">  sitemap.xml</span>\n<span class="line-value">' + escapeHtml(data['sitemap.xml'].substring(0, 3000)) + '</span>\n'; }
-  if (!data['robots.txt'] && !data['sitemap.xml']) h += '<span class="line-comment">  No robots.txt or sitemap.xml found</span>';
+  // Backend returns data.robots_txt = { exists, raw, disallowed_paths, interesting_paths, ... }
+  const robots = data.robots_txt || data;
+  if (robots.exists || data['robots.txt']) {
+    h += '<span class="line-header">  robots.txt</span>\n';
+    if (robots.user_agents && robots.user_agents.length > 0) {
+      h += '<span class="line-key">  User-Agents:</span> <span class="line-value">' + escapeHtml(robots.user_agents.join(', ')) + '</span>\n';
+    }
+    if (robots.crawl_delay) {
+      h += '<span class="line-key">  Crawl-Delay:</span> <span class="line-value">' + escapeHtml(robots.crawl_delay) + '</span>\n';
+    }
+    if (robots.disallowed_paths && robots.disallowed_paths.length > 0) {
+      h += '\n<span class="line-header">  DISALLOWED PATHS (' + robots.disallowed_paths.length + ')</span>\n';
+      robots.disallowed_paths.forEach(p => {
+        h += '  <span class="line-value">  ├─ ' + escapeHtml(p) + '</span>\n';
+      });
+    }
+    if (robots.interesting_paths && robots.interesting_paths.length > 0) {
+      h += '\n<span class="line-header">  ⚠ INTERESTING PATHS</span>\n';
+      robots.interesting_paths.forEach(p => {
+        h += '  <span class="line-warn">  ⚠ ' + escapeHtml(p) + '</span>\n';
+      });
+    }
+    if (robots.raw) {
+      h += '\n<span class="line-header">  RAW</span>\n<span class="line-value">' + escapeHtml(robots.raw.substring(0, 2000)) + '</span>\n';
+    }
+  } else if (data['robots.txt']) {
+    h += '<span class="line-header">  robots.txt</span>\n<span class="line-value">' + escapeHtml(data['robots.txt']) + '</span>\n';
+  } else {
+    h += '<span class="line-comment">  No robots.txt found</span>\n';
+  }
+  // Sitemaps
+  const sitemaps = data.sitemaps || [];
+  if (sitemaps.length > 0) {
+    h += '\n<span class="line-header">  SITEMAPS</span>\n';
+    sitemaps.forEach(sm => {
+      h += '  <span class="badge-found">  ✓ ' + escapeHtml(sm.url || '') + ' (' + (sm.urls_count || 0) + ' URLs)</span>\n';
+      if (sm.sample_urls && sm.sample_urls.length > 0) {
+        sm.sample_urls.slice(0, 5).forEach(u => {
+          h += '    <span class="line-value">├─ ' + escapeHtml(u) + '</span>\n';
+        });
+      }
+    });
+  } else if (data['sitemap.xml']) {
+    h += '\n<span class="line-header">  sitemap.xml</span>\n<span class="line-value">' + escapeHtml(data['sitemap.xml'].substring(0, 3000)) + '</span>\n';
+  }
   return h;
 }
 
-// ────── RENDERERS (new 14 modules) ──────
+// ────── RENDERERS (modules 12-25) ──────
 function renderEmailSec(data) {
   let h = '';
-  ['spf', 'dmarc', 'dkim'].forEach(type => {
-    const rec = data[type];
-    if (rec) {
-      const status = rec.found || rec.record ? 'badge-found' : 'badge-missing';
-      const icon = rec.found || rec.record ? '✓' : '✗';
-      h += '<span class="' + status + '">  ' + icon + ' ' + type.toUpperCase() + '</span>\n';
-      if (rec.record) h += '    <span class="line-sub">' + escapeHtml(rec.record) + '</span>\n';
-      if (rec.details) h += '    <span class="line-comment">' + escapeHtml(rec.details) + '</span>\n';
-      h += '\n';
+  // Backend returns data.spf = { record, status, policy, ... }, data.dmarc = { ... }, data.dkim = { status, selectors }
+  // MX
+  if (data.mx && data.mx.length > 0) {
+    h += '<span class="line-header">  MX SERVERS</span>\n';
+    data.mx.forEach(mx => {
+      h += '  <span class="line-value">  ├─ [' + mx.priority + '] ' + escapeHtml(mx.server || '') + '</span>\n';
+    });
+    h += '\n';
+  }
+  // SPF
+  if (data.spf) {
+    const hasSpf = data.spf.status && data.spf.status.includes('FOUND');
+    h += '<span class="' + (hasSpf ? 'badge-found' : 'badge-missing') + '">  ' + (hasSpf ? '✓' : '✗') + ' SPF — ' + escapeHtml(data.spf.status || '') + '</span>\n';
+    if (data.spf.record) h += '    <span class="line-sub">' + escapeHtml(data.spf.record) + '</span>\n';
+    if (data.spf.policy) h += '    <span class="line-comment">Policy: ' + escapeHtml(data.spf.policy) + '</span>\n';
+    h += '\n';
+  }
+  // DMARC
+  if (data.dmarc) {
+    const hasDmarc = data.dmarc.status && data.dmarc.status.includes('FOUND');
+    h += '<span class="' + (hasDmarc ? 'badge-found' : 'badge-missing') + '">  ' + (hasDmarc ? '✓' : '✗') + ' DMARC — ' + escapeHtml(data.dmarc.status || '') + '</span>\n';
+    if (data.dmarc.record) h += '    <span class="line-sub">' + escapeHtml(data.dmarc.record) + '</span>\n';
+    if (data.dmarc.policy) h += '    <span class="line-comment">Policy: ' + escapeHtml(data.dmarc.policy) + ' | Strength: ' + escapeHtml(data.dmarc.strength || '') + '</span>\n';
+    h += '\n';
+  }
+  // DKIM
+  if (data.dkim) {
+    const hasDkim = data.dkim.status && data.dkim.status.includes('FOUND');
+    h += '<span class="' + (hasDkim ? 'badge-found' : 'badge-missing') + '">  ' + (hasDkim ? '✓' : '✗') + ' DKIM — ' + escapeHtml(data.dkim.status || '') + '</span>\n';
+    if (data.dkim.selectors && data.dkim.selectors.length > 0) {
+      data.dkim.selectors.forEach(s => {
+        h += '    <span class="line-sub">Selector: ' + escapeHtml(s.selector || '') + '</span>\n';
+      });
     }
-  });
+    h += '\n';
+  }
+  // Score & Grade
   if (data.score !== undefined) {
-    h += '<span class="line-key">  Email Security Score:</span> <span class="line-value">' + data.score + '/100</span>\n';
+    const gc = data.grade && data.grade.startsWith('A') ? 'grade-a' : data.grade === 'B' ? 'grade-b' : data.grade === 'C' ? 'grade-c' : 'grade-f';
+    h += '<span class="line-key">  Email Security Score:</span> <span class="line-value">' + data.score + '/100</span>';
+    if (data.grade) h += ' <span class="badge-grade ' + gc + '">' + data.grade + '</span>';
+    h += '\n';
   }
   return h || renderGeneric(data);
 }
 
 function renderTrace(data) {
   let h = '';
+  if (data.ip) h += '<span class="line-key">  Target IP:</span> <span class="line-value">' + escapeHtml(data.ip) + '</span>\n\n';
   if (data.hops && Array.isArray(data.hops)) {
     h += '<span class="badge-found">  ✓ ' + data.hops.length + ' hop(s) traced</span>\n\n';
     data.hops.forEach((hop, i) => {
-      const num = String(i + 1).padStart(2, '0');
+      const num = String(hop.ttl || i + 1).padStart(2, '0');
       h += '  <span class="line-key">  [' + num + ']</span> ';
-      h += '<span class="line-value">' + escapeHtml(hop.ip || hop.host || '*').padEnd(20) + '</span>';
-      if (hop.rtt) h += ' <span class="line-comment">' + escapeHtml(hop.rtt) + '</span>';
-      if (hop.hostname) h += ' <span class="badge-found">(' + escapeHtml(hop.hostname) + ')</span>';
+      h += '<span class="line-value">' + escapeHtml(hop.ip || '*').padEnd(20) + '</span>';
+      if (hop.rtt_ms !== undefined && hop.rtt_ms !== null) h += ' <span class="line-comment">' + hop.rtt_ms + ' ms</span>';
+      else if (hop.rtt) h += ' <span class="line-comment">' + escapeHtml(String(hop.rtt)) + '</span>';
+      if (hop.hostname && hop.hostname !== hop.ip && hop.hostname !== '* * *') h += ' <span class="badge-found">(' + escapeHtml(hop.hostname) + ')</span>';
       h += '\n';
     });
+    if (data.stats) {
+      h += '\n<span class="line-key">  Destination Reached:</span> <span class="' + (data.stats.destination_reached ? 'badge-found' : 'line-error') + '">' + (data.stats.destination_reached ? 'YES ✓' : 'NO ✗') + '</span>\n';
+    }
   }
   return h || renderGeneric(data);
 }
 
 function renderCloud(data) {
   let h = '';
-  if (data.provider) {
-    h += '<span class="line-key">  Provider:</span> <span class="badge-found">' + escapeHtml(data.provider) + '</span>\n';
-    if (data.cdn) h += '<span class="line-key">  CDN:</span>      <span class="line-value">' + escapeHtml(data.cdn) + '</span>\n';
-    if (data.details) {
-      h += '\n<span class="line-header">  DETECTION DETAILS</span>\n';
-      Object.entries(data.details).forEach(([k, v]) => {
-        h += '  <span class="line-key">  ' + escapeHtml(k) + ':</span> <span class="line-value">' + escapeHtml(String(v)) + '</span>\n';
-      });
-    }
+  // Backend: data.provider, data.cdn, data.cnames, data.indicators, data.headers_sample, data.ip
+  if (data.ip) h += '<span class="line-key">  IP:</span>       <span class="line-value">' + escapeHtml(data.ip) + '</span>\n';
+  h += '<span class="line-key">  Provider:</span> <span class="badge-found">' + escapeHtml(data.provider || 'Unknown') + '</span>\n';
+  h += '<span class="line-key">  CDN:</span>      <span class="line-value">' + escapeHtml(data.cdn || 'None detected') + '</span>\n';
+  if (data.cnames && data.cnames.length > 0) {
+    h += '\n<span class="line-header">  CNAME RECORDS</span>\n';
+    data.cnames.forEach(cn => { h += '  <span class="line-value">  ├─ ' + escapeHtml(cn) + '</span>\n'; });
   }
-  if (data.ip_ranges) {
-    h += '\n<span class="line-header">  IP RANGE MATCHES</span>\n';
-    data.ip_ranges.forEach(r => { h += '  <span class="line-value">  ├─ ' + escapeHtml(r) + '</span>\n'; });
+  if (data.indicators && data.indicators.length > 0) {
+    h += '\n<span class="line-header">  DETECTION INDICATORS</span>\n';
+    data.indicators.forEach(ind => { h += '  <span class="line-value">  ├─ ' + escapeHtml(ind) + '</span>\n'; });
   }
-  return h || renderGeneric(data);
+  if (data.headers_sample && Object.keys(data.headers_sample).length > 0) {
+    h += '\n<span class="line-header">  KEY HEADERS</span>\n';
+    Object.entries(data.headers_sample).slice(0, 10).forEach(([k, v]) => {
+      h += '  <span class="line-key">  ' + escapeHtml(k) + ':</span> <span class="line-value">' + escapeHtml(v) + '</span>\n';
+    });
+  }
+  return h;
 }
 
 function renderWAF(data) {
   let h = '';
-  if (data.detected !== undefined) {
-    h += '<span class="line-key">  WAF Detected:</span> <span class="' + (data.detected ? 'badge-found' : 'badge-missing') + '">' + (data.detected ? 'YES' : 'NO') + '</span>\n';
-    if (data.waf_name) h += '<span class="line-key">  WAF Name:</span>     <span class="badge-found">' + escapeHtml(data.waf_name) + '</span>\n';
-    if (data.evidence) {
-      h += '\n<span class="line-header">  EVIDENCE</span>\n';
-      data.evidence.forEach(e => { h += '  <span class="line-value">  ├─ ' + escapeHtml(e) + '</span>\n'; });
-    }
+  // Backend: data.waf_detected (not data.detected), data.waf_name, data.waf_triggered, data.evidence, data.fingerprints
+  const detected = data.waf_detected !== undefined ? data.waf_detected : data.detected;
+  h += '<span class="line-key">  WAF Detected:</span> <span class="' + (detected ? 'badge-found' : 'badge-missing') + '">' + (detected ? 'YES ✓' : 'NO ✗') + '</span>\n';
+  if (data.waf_name && data.waf_name !== 'None') {
+    h += '<span class="line-key">  WAF Name:</span>     <span class="badge-found">' + escapeHtml(data.waf_name) + '</span>\n';
   }
-  return h || renderGeneric(data);
+  if (data.waf_triggered) {
+    h += '<span class="line-key">  WAF Triggered:</span> <span class="line-warn">YES — Blocks malicious payloads</span>\n';
+  }
+  if (data.fingerprints && Object.keys(data.fingerprints).length > 0) {
+    h += '\n<span class="line-header">  FINGERPRINTS</span>\n';
+    Object.entries(data.fingerprints).forEach(([k, v]) => {
+      h += '  <span class="line-key">  ' + escapeHtml(k) + ':</span> <span class="line-value">' + escapeHtml(String(v)) + '</span>\n';
+    });
+  }
+  if (data.evidence && data.evidence.length > 0) {
+    h += '\n<span class="line-header">  EVIDENCE</span>\n';
+    data.evidence.forEach(e => { h += '  <span class="line-value">  ├─ ' + escapeHtml(e) + '</span>\n'; });
+  }
+  return h;
 }
 
 function renderJSAnalysis(data) {
   let h = '';
   if (data.scripts && data.scripts.length > 0) {
-    h += '<span class="badge-found">  ✓ ' + data.scripts.length + ' script(s) found</span>\n\n';
+    h += '<span class="badge-found">  ✓ ' + data.scripts.length + ' external script(s) found</span>\n\n';
     data.scripts.forEach(s => { h += '  <span class="line-key">  ⬡</span> <span class="line-value">' + escapeHtml(s) + '</span>\n'; });
   }
-  if (data.apis && data.apis.length > 0) {
-    h += '\n<span class="line-header">  API ENDPOINTS</span>\n';
-    data.apis.forEach(a => { h += '  <span class="line-warn">  → ' + escapeHtml(a) + '</span>\n'; });
+  // Backend: data.api_endpoints (not data.apis)
+  const apis = data.api_endpoints || data.apis || [];
+  if (apis.length > 0) {
+    h += '\n<span class="line-header">  API ENDPOINTS (' + apis.length + ')</span>\n';
+    apis.forEach(a => { h += '  <span class="line-warn">  → ' + escapeHtml(typeof a === 'string' ? a : JSON.stringify(a)) + '</span>\n'; });
   }
-  if (data.secrets && data.secrets.length > 0) {
-    h += '\n<span class="line-header">  ⚠ POTENTIAL SECRETS</span>\n';
-    data.secrets.forEach(s => { h += '  <span class="line-error">  ⚠ ' + escapeHtml(s) + '</span>\n'; });
+  // Backend: data.secrets_found (not data.secrets)
+  const secrets = data.secrets_found || data.secrets || [];
+  if (secrets.length > 0) {
+    h += '\n<span class="line-header">  ⚠ POTENTIAL SECRETS (' + secrets.length + ')</span>\n';
+    secrets.forEach(s => {
+      if (typeof s === 'object') {
+        h += '  <span class="line-error">  ⚠ [' + escapeHtml(s.severity || 'HIGH') + '] ' + escapeHtml(s.type || '') + ': ' + escapeHtml(s.value || '') + '</span>\n';
+      } else {
+        h += '  <span class="line-error">  ⚠ ' + escapeHtml(String(s)) + '</span>\n';
+      }
+    });
+  }
+  if (data.stats) {
+    const cls = data.stats.risk_level === 'CRITICAL' ? 'line-error' : data.stats.risk_level === 'HIGH' ? 'line-warn' : 'badge-found';
+    h += '\n<span class="line-key">  Risk Level:</span> <span class="' + cls + '">' + escapeHtml(data.stats.risk_level || 'LOW') + '</span>\n';
   }
   return h || renderGeneric(data);
 }
 
 function renderLinks(data) {
   let h = '';
-  ['internal', 'external', 'resources', 'forms'].forEach(type => {
-    const items = data[type];
-    if (items && items.length > 0) {
-      h += '<span class="line-header">  ' + type.toUpperCase() + ' (' + items.length + ')</span>\n';
-      items.slice(0, 30).forEach(l => { h += '  <span class="line-value">  ├─ ' + escapeHtml(l) + '</span>\n'; });
+  // Backend: data.internal_links, data.external_links, data.forms, data.hidden_paths, data.emails
+  const sections = [
+    { key: 'internal_links', fallback: 'internal', label: 'INTERNAL LINKS' },
+    { key: 'external_links', fallback: 'external', label: 'EXTERNAL LINKS' },
+    { key: 'hidden_paths', fallback: null, label: '⚠ HIDDEN PATHS' },
+    { key: 'emails', fallback: null, label: 'EMAIL ADDRESSES' },
+  ];
+  sections.forEach(({ key, fallback, label }) => {
+    const items = data[key] || (fallback ? data[fallback] : null) || [];
+    if (items.length > 0) {
+      h += '<span class="line-header">  ' + label + ' (' + items.length + ')</span>\n';
+      items.slice(0, 30).forEach(l => {
+        const display = typeof l === 'string' ? l : JSON.stringify(l);
+        h += '  <span class="line-value">  ├─ ' + escapeHtml(display) + '</span>\n';
+      });
       if (items.length > 30) h += '  <span class="line-comment">  └─ ... and ' + (items.length - 30) + ' more</span>\n';
       h += '\n';
     }
   });
+  // Forms
+  const forms = data.forms || [];
+  if (forms.length > 0) {
+    h += '<span class="line-header">  FORMS (' + forms.length + ')</span>\n';
+    forms.forEach((f, i) => {
+      h += '  <span class="line-key">  [' + (i + 1) + '] ' + escapeHtml(f.method || 'GET') + '</span> <span class="line-value">' + escapeHtml(f.action || '') + '</span>\n';
+      if (f.inputs && f.inputs.length > 0) {
+        f.inputs.forEach(inp => {
+          h += '    <span class="line-comment">  ├─ ' + escapeHtml(inp.name || '(no name)') + ' [' + escapeHtml(inp.type || 'text') + ']</span>\n';
+        });
+      }
+    });
+  }
   return h || renderGeneric(data);
 }
 
 function renderCMS(data) {
   let h = '';
-  if (data.cms) {
-    h += '<span class="line-key">  CMS Detected:</span> <span class="badge-found">' + escapeHtml(data.cms) + '</span>\n';
-    if (data.version) h += '<span class="line-key">  Version:</span>      <span class="line-value">' + escapeHtml(data.version) + '</span>\n';
-    if (data.themes) {
-      h += '\n<span class="line-header">  THEMES</span>\n';
-      data.themes.forEach(t => { h += '  <span class="line-value">  ├─ ' + escapeHtml(t) + '</span>\n'; });
-    }
-    if (data.plugins) {
-      h += '\n<span class="line-header">  PLUGINS</span>\n';
-      data.plugins.forEach(p => { h += '  <span class="line-value">  ├─ ' + escapeHtml(p) + '</span>\n'; });
-    }
-  } else { h += '<span class="line-comment">  No CMS detected</span>'; }
+  // Backend: data.cms, data.version, data.details = { paths_found, themes, plugins, users_exposed }, data.vulnerabilities
+  h += '<span class="line-key">  CMS Detected:</span> <span class="' + (data.cms !== 'Unknown' ? 'badge-found' : 'badge-missing') + '">' + escapeHtml(data.cms || 'Unknown') + '</span>\n';
+  if (data.version && data.version !== 'Unknown') h += '<span class="line-key">  Version:</span>      <span class="line-value">' + escapeHtml(data.version) + '</span>\n';
+  const details = data.details || {};
+  if (details.paths_found && details.paths_found.length > 0) {
+    h += '\n<span class="line-header">  DETECTED PATHS</span>\n';
+    details.paths_found.forEach(p => { h += '  <span class="line-value">  ├─ ' + escapeHtml(p) + '</span>\n'; });
+  }
+  // themes/plugins from details or top-level
+  const themes = details.themes || data.themes || [];
+  const plugins = details.plugins || data.plugins || [];
+  if (themes.length > 0) {
+    h += '\n<span class="line-header">  THEMES (' + themes.length + ')</span>\n';
+    themes.forEach(t => { h += '  <span class="line-value">  ├─ ' + escapeHtml(t) + '</span>\n'; });
+  }
+  if (plugins.length > 0) {
+    h += '\n<span class="line-header">  PLUGINS (' + plugins.length + ')</span>\n';
+    plugins.forEach(p => { h += '  <span class="line-value">  ├─ ' + escapeHtml(p) + '</span>\n'; });
+  }
+  if (details.users_exposed && details.users_exposed.length > 0) {
+    h += '\n<span class="line-header">  ⚠ EXPOSED USERS</span>\n';
+    details.users_exposed.forEach(u => {
+      h += '  <span class="line-error">  ⚠ ' + escapeHtml(u.name || '') + ' (' + escapeHtml(u.slug || '') + ')</span>\n';
+    });
+  }
+  if (data.vulnerabilities && data.vulnerabilities.length > 0) {
+    h += '\n<span class="line-header">  ⚠ VULNERABILITIES</span>\n';
+    data.vulnerabilities.forEach(v => {
+      h += '  <span class="line-error">  ⚠ [' + escapeHtml(v.severity || '') + '] ' + escapeHtml(v.type || '') + '</span>\n';
+      if (v.detail) h += '    <span class="line-sub">' + escapeHtml(v.detail) + '</span>\n';
+    });
+  }
   return h;
 }
 
 function renderCORS(data) {
   let h = '';
   if (data.vulnerable !== undefined) {
-    h += '<span class="line-key">  CORS Status:</span> <span class="' + (data.vulnerable ? 'line-error' : 'badge-found') + '">' + (data.vulnerable ? '⚠ VULNERABLE' : '✓ SECURE') + '</span>\n\n';
-    if (data.headers) {
-      Object.entries(data.headers).forEach(([k, v]) => {
-        h += '<span class="line-key">  ' + escapeHtml(k) + ':</span> <span class="line-value">' + escapeHtml(v) + '</span>\n';
-      });
-    }
-    if (data.tests) {
-      h += '\n<span class="line-header">  TESTS</span>\n';
-      data.tests.forEach(t => {
-        const icon = t.vulnerable ? '⚠' : '✓';
-        const cls = t.vulnerable ? 'line-error' : 'badge-found';
-        h += '  <span class="' + cls + '">  ' + icon + ' ' + escapeHtml(t.test || t.name || '') + '</span>\n';
-        if (t.details) h += '    <span class="line-sub">' + escapeHtml(t.details) + '</span>\n';
-      });
-    }
+    h += '<span class="line-key">  CORS Status:</span> <span class="' + (data.vulnerable ? 'line-error' : 'badge-found') + '">' + (data.vulnerable ? '⚠ VULNERABLE' : '✓ SECURE') + '</span>\n';
+    if (data.risk_level) h += '<span class="line-key">  Risk Level:</span>  <span class="line-value">' + escapeHtml(data.risk_level) + '</span>\n';
+    h += '\n';
+  }
+  if (data.tests && data.tests.length > 0) {
+    h += '<span class="line-header">  CORS TESTS (' + data.tests.length + ')</span>\n';
+    data.tests.forEach(t => {
+      if (t.error) {
+        h += '  <span class="line-comment">  ○ ' + escapeHtml(t.test || '') + ' — ' + escapeHtml(t.error) + '</span>\n';
+        return;
+      }
+      const icon = t.vulnerable ? '⚠' : '✓';
+      const cls = t.vulnerable ? 'line-error' : 'badge-found';
+      h += '  <span class="' + cls + '">  ' + icon + ' ' + escapeHtml(t.test || t.name || '') + '</span>\n';
+      h += '    <span class="line-sub">Origin: ' + escapeHtml(t.origin_sent || '') + ' → ACAO: ' + escapeHtml(t.acao_returned || 'None') + '</span>\n';
+      if (t.credentials_allowed) h += '    <span class="line-error">  Credentials: ALLOWED!</span>\n';
+      if (t.note) h += '    <span class="line-warn">' + escapeHtml(t.note) + '</span>\n';
+    });
   }
   return h || renderGeneric(data);
 }
@@ -664,16 +1049,22 @@ function renderCORS(data) {
 function renderRedirect(data) {
   let h = '';
   if (data.vulnerable !== undefined) {
-    h += '<span class="line-key">  Status:</span> <span class="' + (data.vulnerable ? 'line-error' : 'badge-found') + '">' + (data.vulnerable ? '⚠ VULNERABLE' : '✓ SECURE') + '</span>\n\n';
+    h += '<span class="line-key">  Status:</span> <span class="' + (data.vulnerable ? 'line-error' : 'badge-found') + '">' + (data.vulnerable ? '⚠ VULNERABLE' : '✓ SECURE') + '</span>\n';
+  }
+  if (data.stats) {
+    h += '<span class="line-key">  Parameters Tested:</span> <span class="line-value">' + (data.stats.parameters_tested || 0) + '</span>\n';
+    h += '<span class="line-key">  Vulnerabilities:</span>   <span class="line-value">' + (data.stats.vulnerabilities || 0) + '</span>\n\n';
   }
   if (data.tests && data.tests.length > 0) {
     h += '<span class="line-header">  REDIRECT TESTS</span>\n';
     data.tests.forEach(t => {
-      const icon = t.vulnerable ? '⚠' : '✓';
-      const cls = t.vulnerable ? 'line-error' : 'badge-found';
-      h += '  <span class="' + cls + '">  ' + icon + ' ' + escapeHtml(t.payload || t.test || '') + '</span>\n';
-      if (t.location) h += '    <span class="line-sub">→ ' + escapeHtml(t.location) + '</span>\n';
+      const icon = t.vulnerable ? '⚠' : '→';
+      const cls = t.vulnerable ? 'line-error' : 'line-value';
+      h += '  <span class="' + cls + '">  ' + icon + ' ?' + escapeHtml(t.parameter || t.payload || t.test || '') + ' → HTTP ' + (t.status_code || '') + '</span>\n';
+      if (t.redirect_to) h += '    <span class="line-sub">→ ' + escapeHtml(t.redirect_to) + '</span>\n';
     });
+  } else if (!data.tests || data.tests.length === 0) {
+    h += '<span class="line-comment">  No redirect vulnerabilities found — all parameters safe</span>\n';
   }
   return h || renderGeneric(data);
 }
@@ -683,34 +1074,70 @@ function renderCookies(data) {
   if (data.cookies && data.cookies.length > 0) {
     h += '<span class="badge-found">  ✓ ' + data.cookies.length + ' cookie(s) found</span>\n\n';
     data.cookies.forEach(c => {
-      h += '<span class="line-key">  ┌─ ' + escapeHtml(c.name) + '</span>\n';
-      if (c.value) h += '  <span class="line-value">  │  Value: ' + escapeHtml(c.value.substring(0, 60)) + (c.value.length > 60 ? '...' : '') + '</span>\n';
-      h += '  <span class="' + (c.secure ? 'badge-found' : 'badge-missing') + '">  │  Secure: ' + (c.secure ? 'YES' : 'NO') + '</span>\n';
-      h += '  <span class="' + (c.httponly ? 'badge-found' : 'badge-missing') + '">  │  HttpOnly: ' + (c.httponly ? 'YES' : 'NO') + '</span>\n';
-      if (c.samesite) h += '  <span class="line-value">  │  SameSite: ' + escapeHtml(c.samesite) + '</span>\n';
+      const riskCls = c.risk === 'CRITICAL' ? 'line-error' : c.risk === 'MEDIUM' ? 'line-warn' : 'badge-found';
+      h += '<span class="line-key">  ┌─ ' + escapeHtml(c.name) + '</span>';
+      if (c.risk) h += ' <span class="' + riskCls + '">[' + c.risk + ']</span>';
+      if (c.sensitive) h += ' <span class="line-warn">⚠ SENSITIVE</span>';
+      h += '\n';
+      if (c.value) h += '  <span class="line-value">  │  Value: ' + escapeHtml(String(c.value).substring(0, 60)) + (String(c.value).length > 60 ? '...' : '') + '</span>\n';
+      h += '  <span class="' + (c.secure ? 'badge-found' : 'badge-missing') + '">  │  Secure: ' + (c.secure ? 'YES ✓' : 'NO ✗') + '</span>\n';
+      h += '  <span class="' + (c.httponly ? 'badge-found' : 'badge-missing') + '">  │  HttpOnly: ' + (c.httponly ? 'YES ✓' : 'NO ✗') + '</span>\n';
+      const ss = c.samesite || 'Not set';
+      h += '  <span class="' + (ss !== 'Not set' ? 'badge-found' : 'badge-missing') + '">  │  SameSite: ' + escapeHtml(ss) + '</span>\n';
+      if (c.expires) h += '  <span class="line-value">  │  Expires: ' + escapeHtml(c.expires) + '</span>\n';
+      if (c.issues && c.issues.length > 0) {
+        c.issues.forEach(issue => {
+          h += '  <span class="line-error">  │  ⚠ ' + escapeHtml(issue) + '</span>\n';
+        });
+      }
+      if (c.flags && c.flags.length > 0) {
+        h += '  <span class="badge-found">  │  Flags: ' + escapeHtml(c.flags.join(', ')) + '</span>\n';
+      }
       h += '  <span class="line-value">  └─────────</span>\n\n';
     });
   } else { h += '<span class="line-comment">  No cookies found</span>'; }
-  if (data.score !== undefined) h += '\n<span class="line-key">  Cookie Security Score:</span> <span class="line-value">' + data.score + '/100</span>';
+  if (data.score !== undefined) {
+    const gc = data.grade && data.grade.startsWith('A') ? 'grade-a' : data.grade === 'B' ? 'grade-b' : 'grade-f';
+    h += '\n<span class="line-key">  Cookie Security Score:</span> <span class="line-value">' + data.score + '/100</span>';
+    if (data.grade) h += ' <span class="badge-grade ' + gc + '">' + data.grade + '</span>';
+  }
   return h;
 }
 
 function renderTakeover(data) {
   let h = '';
-  if (data.results && data.results.length > 0) {
-    h += '<span class="badge-found">  Checked ' + data.results.length + ' subdomain(s)</span>\n\n';
-    data.results.forEach(r => {
-      const icon = r.vulnerable ? '⚠' : '✓';
-      const cls = r.vulnerable ? 'line-error' : 'badge-found';
-      h += '  <span class="' + cls + '">  ' + icon + ' ' + escapeHtml(r.subdomain || r.domain || '') + '</span>';
-      if (r.cname) h += ' <span class="line-comment">→ ' + escapeHtml(r.cname) + '</span>';
-      if (r.service) h += ' <span class="line-warn">[' + escapeHtml(r.service) + ']</span>';
+  // Backend: data.subdomains_checked (not data.results), data.vulnerable (array, not data.vulnerable_count)
+  const checked = data.subdomains_checked || data.results || [];
+  const vulns = data.vulnerable || [];
+  if (checked.length > 0) {
+    h += '<span class="badge-found">  Checked ' + checked.length + ' subdomain(s)</span>\n\n';
+  }
+  // Show vulnerabilities first
+  if (vulns.length > 0) {
+    h += '<span class="line-header">  ⚠ VULNERABLE SUBDOMAINS (' + vulns.length + ')</span>\n';
+    vulns.forEach(v => {
+      h += '  <span class="line-error">  ⚠ ' + escapeHtml(v.subdomain || '') + '</span>';
+      if (v.cname) h += ' <span class="line-comment">→ ' + escapeHtml(v.cname) + '</span>';
+      if (v.service) h += ' <span class="line-warn">[' + escapeHtml(v.service) + ']</span>';
+      h += '\n';
+      if (v.detail) h += '    <span class="line-sub">' + escapeHtml(v.detail) + '</span>\n';
+      h += '    <span class="line-error">  Severity: ' + escapeHtml(v.severity || 'HIGH') + ' | Status: ' + escapeHtml(v.status || '') + '</span>\n';
+    });
+    h += '\n';
+  }
+  // Show all checked
+  if (checked.length > 0) {
+    h += '<span class="line-header">  ALL CHECKED SUBDOMAINS</span>\n';
+    checked.forEach(r => {
+      const icon = r.status && r.status.includes('VULNERABLE') ? '⚠' : '✓';
+      const cls = r.status && r.status.includes('VULNERABLE') ? 'line-error' : 'badge-found';
+      h += '  <span class="' + cls + '">  ' + icon + ' ' + escapeHtml(r.subdomain || '') + '</span>';
+      if (r.cname && r.cname !== 'No CNAME') h += ' <span class="line-comment">→ ' + escapeHtml(r.cname) + '</span>';
       h += '\n';
     });
   }
-  if (data.vulnerable_count !== undefined) {
-    h += '\n<span class="line-key">  Vulnerable:</span> <span class="' + (data.vulnerable_count > 0 ? 'line-error' : 'badge-found') + '">' + data.vulnerable_count + '</span>\n';
-  }
+  h += '\n<span class="line-key">  Vulnerable Count:</span> <span class="' + (vulns.length > 0 ? 'line-error' : 'badge-found') + '">' + vulns.length + '</span>\n';
+  if (data.stats) h += '<span class="line-key">  Services Checked:</span>  <span class="line-value">' + (data.stats.services_checked || 0) + '</span>\n';
   return h || renderGeneric(data);
 }
 
@@ -718,14 +1145,18 @@ function renderReputation(data) {
   let h = '';
   if (data.score !== undefined) {
     const gc = data.score >= 80 ? 'grade-a' : data.score >= 60 ? 'grade-b' : data.score >= 40 ? 'grade-c' : 'grade-f';
-    h += '<span class="line-key">  Reputation Score:</span> <span class="line-value">' + data.score + '/100</span> <span class="badge-grade ' + gc + '">' + (data.grade || '') + '</span>\n\n';
+    h += '<span class="line-key">  Reputation Score:</span> <span class="line-value">' + data.score + '/100</span> <span class="badge-grade ' + gc + '">' + (data.grade || '') + '</span>\n';
+    h += '<span class="line-key">  Blacklisted:</span>      <span class="' + (data.blacklisted ? 'line-error' : 'badge-found') + '">' + (data.blacklisted ? 'YES ⚠' : 'NO ✓') + '</span>\n\n';
   }
-  if (data.blacklists) {
-    h += '<span class="line-header">  BLACKLIST CHECK</span>\n';
-    data.blacklists.forEach(bl => {
-      const icon = bl.listed ? '⚠' : '✓';
-      const cls = bl.listed ? 'line-error' : 'badge-found';
-      h += '  <span class="' + cls + '">  ' + icon + ' ' + escapeHtml(bl.name || bl.source || '') + '</span>\n';
+  // Backend: data.checks (not data.blacklists)
+  const checks = data.checks || data.blacklists || [];
+  if (checks.length > 0) {
+    h += '<span class="line-header">  BLACKLIST CHECK (' + checks.length + ' lists)</span>\n';
+    checks.forEach(bl => {
+      const isListed = (bl.status && bl.status.includes('LISTED')) || bl.listed;
+      const icon = isListed ? '⚠' : '✓';
+      const cls = isListed ? 'line-error' : 'badge-found';
+      h += '  <span class="' + cls + '">  ' + icon + ' ' + escapeHtml(bl.blacklist || bl.name || bl.source || '') + ' — ' + escapeHtml(bl.status || (bl.listed ? 'LISTED' : 'CLEAN')) + '</span>\n';
     });
   }
   return h || renderGeneric(data);
