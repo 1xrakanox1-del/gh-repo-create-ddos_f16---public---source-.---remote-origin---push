@@ -14,15 +14,15 @@ const ICONS = {
   ports: '<svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
   security: '<svg viewBox="0 0 24 24"><path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z"/><path d="M9 12l2 2 4-4"/></svg>',
   reverse_dns: '<svg viewBox="0 0 24 24"><path d="M9 14l-4 4 4 4"/><path d="M5 18h14a2 2 0 002-2V8"/><path d="M15 10l4-4-4-4"/><path d="M19 6H5a2 2 0 00-2 2v8"/></svg>',
-  geo: '<svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>',
-  robots: '<svg viewBox="0 0 24 24"><path d="M14 3v4a1 1 0 001 1h4"/><path d="M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/><path d="M9 13h6M9 17h4"/></svg>',
+  shodan: '<svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>',
+  info_leak: '<svg viewBox="0 0 24 24"><path d="M14 3v4a1 1 0 001 1h4"/><path d="M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/><path d="M9 13h6M9 17h4"/></svg>',
   email_sec: '<svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 4l-10 8L2 4"/><path d="M17 15l2 2 4-4" stroke="#00ff41" stroke-width="2"/></svg>',
-  trace: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="12" r="5" fill="none"/><circle cx="12" cy="12" r="9" fill="none"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>',
+  wayback: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="12" r="5" fill="none"/><circle cx="12" cy="12" r="9" fill="none"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>',
   cloud: '<svg viewBox="0 0 24 24"><path d="M18 10h-1.26A8 8 0 109 20h9a5 5 0 000-10z"/></svg>',
   waf: '<svg viewBox="0 0 24 24"><path d="M12 2l7 4v5c0 5.25-3.5 9.74-7 11-3.5-1.26-7-5.75-7-11V6l7-4z"/><path d="M8 12h8M8 8h8M8 16h8"/></svg>',
-  js_analysis: '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z" rx="2"/><path d="M8 12v4c0 1 1 2 2 2s2-1 2-2"/><path d="M14 10c1 0 2 .5 2 2s-1 2-2 2 2 .5 2 2-1 2-2 2"/></svg>',
-  links: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>',
-  cms: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>',
+  threat_intel: '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z" rx="2"/><path d="M8 12v4c0 1 1 2 2 2s2-1 2-2"/><path d="M14 10c1 0 2 .5 2 2s-1 2-2 2 2 .5 2 2-1 2-2 2"/></svg>',
+  sensitive_paths: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>',
+  cve_hunter: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>',
   cors: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>',
   redirect: '<svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>',
   cookies: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="8" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="8" r="1" fill="currentColor"/><circle cx="10" cy="14" r="1" fill="currentColor"/><circle cx="15" cy="14" r="1" fill="currentColor"/></svg>',
@@ -41,16 +41,16 @@ const MODULES = [
   { id: 'email_sec',   name: 'EMAIL_SECURITY',   cat: 'dns_intel',      desc: 'SPF/DKIM/DMARC audit' },
   // Infrastructure
   { id: 'ports',       name: 'PORT_SCANNER_PRO', cat: 'infrastructure', desc: 'Scan 30 critical ports with service detection' },
-  { id: 'trace',       name: 'NETWORK_TRACE',    cat: 'infrastructure', desc: 'Traceroute & hop analysis' },
+  { id: 'wayback',     name: 'WAYBACK_RECON',    cat: 'infrastructure', desc: 'Historical URLs + Hidden endpoints + Config files' },
   { id: 'cloud',       name: 'CLOUD_INFRA',      cat: 'infrastructure', desc: 'AWS/Azure/GCP/Cloudflare detection' },
-  { id: 'geo',         name: 'GEOIP_ADVANCED',   cat: 'infrastructure', desc: 'Geolocation, ISP, ASN data' },
+  { id: 'shodan',      name: 'SHODAN_INTEL',     cat: 'infrastructure', desc: 'Real CVEs + Open ports + CPEs from Shodan' },
   // Web Analysis
   { id: 'waf',         name: 'WAF_DETECTION',    cat: 'web_analysis',   desc: 'Detect WAF/CDN (Cloudflare, AWS, etc.)' },
-  { id: 'tech',        name: 'TECH_STACK_XRAY',  cat: 'web_analysis',   desc: 'Detect 50+ CMS/frameworks/libraries' },
-  { id: 'headers',     name: 'HTTP_FINGERPRINT', cat: 'web_analysis',   desc: 'Server headers & redirect chain' },
-  { id: 'js_analysis', name: 'JS_ANALYZER',      cat: 'web_analysis',   desc: 'JavaScript files, APIs, secrets detection' },
-  { id: 'links',       name: 'LINK_EXTRACTOR',   cat: 'web_analysis',   desc: 'All links, forms, and resources' },
-  { id: 'cms',         name: 'CMS_SCANNER',      cat: 'web_analysis',   desc: 'WordPress/Joomla/Drupal version detection' },
+  { id: 'tech',            name: 'DEEP_TECH_FP',     cat: 'web_analysis',   desc: '200+ signatures - CMS + Frameworks + Analytics' },
+  { id: 'headers',         name: 'HTTP_FINGERPRINT', cat: 'web_analysis',   desc: 'Server headers & redirect chain' },
+  { id: 'threat_intel',    name: 'THREAT_INTEL',     cat: 'intelligence',   desc: 'AlienVault OTX: Threat pulses + Malware + MITRE ATT&CK' },
+  { id: 'sensitive_paths', name: 'PATH_SCANNER',     cat: 'security',       desc: '120+ paths: .git, .env, backups, admin panels' },
+  { id: 'cve_hunter',     name: 'CVE_HUNTER',       cat: 'security',       desc: 'Real CVE lookup + CVSS scores + Exploits' },
   // Security Audit
   { id: 'ssl',         name: 'SSL_TLS_AUDIT',    cat: 'security',       desc: 'Certificate chain, ciphers, vulnerabilities' },
   { id: 'security',    name: 'SEC_HEADERS',      cat: 'security',       desc: 'Audit 12 security headers (A+ to F grade)' },
@@ -61,7 +61,7 @@ const MODULES = [
   // Intelligence
   { id: 'whois',       name: 'WHOIS_INTEL',      cat: 'intelligence',   desc: 'Registrar, registrant, dates, DNSSEC' },
   { id: 'reputation',  name: 'DOMAIN_REPUTATION',cat: 'intelligence',   desc: 'Check 10+ blacklists & threat feeds' },
-  { id: 'robots',      name: 'ROBOTS_SITEMAP',   cat: 'intelligence',   desc: 'robots.txt & sitemap extraction' },
+  { id: 'info_leak',    name: 'INFO_LEAK_DETECT', cat: 'intelligence',   desc: 'HTML comments + Secrets + Source maps + Error pages' },
   // Full Scan
   { id: 'full_scan',   name: 'FULL_RECON',       cat: 'full_scan',      desc: 'Execute ALL modules at once' },
   { id: 'export_report', name: 'EXPORT_REPORT',  cat: 'full_scan',      desc: 'Download full JSON/TXT report' }
@@ -345,19 +345,19 @@ function renderResults(moduleId) {
     case 'whois':       html += renderWhois(data); break;
     case 'headers':     html += renderHeaders(data); break;
     case 'ssl':         html += renderSSL(data); break;
-    case 'tech':        html += renderTech(data); break;
+    case 'tech':        html += renderDeepTech(data); break;
     case 'ports':       html += renderPorts(data); break;
     case 'security':    html += renderSecurity(data); break;
     case 'reverse_dns': html += renderReverseDNS(data); break;
-    case 'geo':         html += renderGeo(data); break;
-    case 'robots':      html += renderRobots(data); break;
+    case 'shodan':      html += renderShodan(data); break;
+    case 'info_leak':   html += renderInfoLeak(data); break;
     case 'email_sec':   html += renderEmailSec(data); break;
-    case 'trace':       html += renderTrace(data); break;
+    case 'wayback':     html += renderWayback(data); break;
     case 'cloud':       html += renderCloud(data); break;
     case 'waf':         html += renderWAF(data); break;
-    case 'js_analysis': html += renderJSAnalysis(data); break;
-    case 'links':       html += renderLinks(data); break;
-    case 'cms':         html += renderCMS(data); break;
+    case 'threat_intel': html += renderThreatIntel(data); break;
+    case 'sensitive_paths': html += renderSensitivePaths(data); break;
+    case 'cve_hunter':  html += renderCveHunter(data); break;
     case 'cors':        html += renderCORS(data); break;
     case 'redirect':    html += renderRedirect(data); break;
     case 'cookies':     html += renderCookies(data); break;
@@ -577,46 +577,45 @@ function renderSSL(data) {
   return h || '<span class="line-comment">  No SSL certificate data</span>';
 }
 
-function renderTech(data) {
+function renderDeepTech(data) {
   let h = '';
-  // Backend returns data.technologies = { server: [...], cms: [...], framework: [...], javascript: [...], ... }
-  const techs = data.technologies || {};
-  if (typeof techs === 'object' && !Array.isArray(techs)) {
-    let totalCount = 0;
-    Object.values(techs).forEach(arr => { if (Array.isArray(arr)) totalCount += arr.length; });
-    if (totalCount > 0) {
-      h += '<span class="badge-found">  ✓ Detected ' + totalCount + ' technolog' + (totalCount > 1 ? 'ies' : 'y') + '</span>\n\n';
-      Object.entries(techs).forEach(([category, items]) => {
-        if (Array.isArray(items) && items.length > 0) {
-          h += '<span class="line-header">  ' + category.toUpperCase().replace('_', ' ') + '</span>\n';
-          items.forEach(item => {
-            h += '  <span class="line-key">  ⬡</span> <span class="line-value">' + escapeHtml(String(item)) + '</span>\n';
-          });
-          h += '\n';
-        }
-      });
-    } else {
-      h += '<span class="line-comment">  No technologies detected</span>';
-    }
-  } else if (Array.isArray(techs)) {
-    // Fallback for array format
-    if (techs.length > 0) {
-      h += '<span class="badge-found">  ✓ Detected ' + techs.length + ' technologies</span>\n\n';
-      techs.forEach(tech => {
-        const name = typeof tech === 'string' ? tech : (tech.name || JSON.stringify(tech));
-        h += '  <span class="line-key">  ⬡</span> <span class="line-value">' + escapeHtml(name) + '</span>\n';
-      });
-    } else {
-      h += '<span class="line-comment">  No technologies detected</span>';
-    }
-  } else {
-    h += '<span class="line-comment">  No technologies detected</span>';
+  // Summary
+  if (data.summary) {
+    h += '<span class="line-header">  DEEP TECH FINGERPRINT SUMMARY</span>\n';
+    h += '<span class="line-key">  Technologies:</span>    <span class="line-value">' + (data.summary.total_technologies || 0) + '</span>\n';
+    h += '<span class="line-key">  Categories:</span>      <span class="line-value">' + (data.summary.categories_found || 0) + '</span>\n';
+    h += '<span class="line-key">  High Confidence:</span> <span class="badge-found">' + (data.summary.high_confidence || 0) + '</span>\n\n';
   }
-  if (data.stats) {
-    h += '\n<span class="line-key">  Total:</span>      <span class="line-value">' + (data.stats.total_technologies || 0) + '</span>\n';
-    h += '<span class="line-key">  Categories:</span>  <span class="line-value">' + (data.stats.categories || 0) + '</span>\n';
+  if (data.total_detected !== undefined) {
+    h += '<span class="badge-found">  ✓ Detected ' + data.total_detected + ' technolog' + (data.total_detected !== 1 ? 'ies' : 'y') + '</span>\n\n';
   }
-  return h;
+  // Technologies by category
+  if (data.categories && typeof data.categories === 'object') {
+    Object.entries(data.categories).forEach(function([category, items]) {
+      if (Array.isArray(items) && items.length > 0) {
+        h += '<span class="line-header">  ' + escapeHtml(category.toUpperCase()) + '</span>\n';
+        items.forEach(function(item) {
+          h += '  <span class="line-key">  ⬡</span> <span class="line-value">' + escapeHtml(String(item)) + '</span>\n';
+        });
+        h += '\n';
+      }
+    });
+  }
+  // Detailed tech list with confidence
+  if (data.technologies && Array.isArray(data.technologies) && data.technologies.length > 0) {
+    h += '<span class="line-header">  DETAILED DETECTION</span>\n';
+    data.technologies.forEach(function(tech) {
+      const confidence = tech.confidence || 0;
+      const confBar = '█'.repeat(Math.ceil(confidence / 10)) + '░'.repeat(10 - Math.ceil(confidence / 10));
+      const confCls = confidence >= 80 ? 'badge-found' : confidence >= 50 ? 'line-warn' : 'line-comment';
+      h += '  <span class="line-key">  ⬡ ' + escapeHtml(tech.name || 'Unknown').padEnd(22) + '</span>';
+      h += '<span class="' + confCls + '">' + confBar + ' ' + confidence + '%</span>';
+      if (tech.version) h += ' <span class="line-value">v' + escapeHtml(tech.version) + '</span>';
+      h += '\n';
+      h += '    <span class="line-comment">  Category: ' + escapeHtml(tech.category || '') + ' | Method: ' + escapeHtml(tech.method || '') + '</span>\n';
+    });
+  }
+  return h || '<span class="line-comment">  No technologies detected</span>';
 }
 
 function renderPorts(data) {
@@ -713,90 +712,154 @@ function renderReverseDNS(data) {
   return h;
 }
 
-function renderGeo(data) {
+function renderShodan(data) {
   let h = '';
-  // Backend returns data.geo = { ip, continent, country, region, city, ... }
-  const geo = data.geo || data;
-  if (geo.error) {
-    return '<span class="line-error">  ' + escapeHtml(geo.error) + '</span>';
+  // Summary stats
+  if (data.summary) {
+    h += '<span class="line-header">  SHODAN INTERNETDB SUMMARY</span>\n';
+    h += '<span class="line-key">  Data Source:</span>    <span class="line-value">' + escapeHtml(data.summary.data_source || 'Shodan InternetDB') + '</span>\n';
+    h += '<span class="line-key">  Total Ports:</span>    <span class="line-value">' + (data.summary.total_ports || 0) + '</span>\n';
+    h += '<span class="line-key">  Total CVEs:</span>     <span class="line-value">' + (data.summary.total_cves || 0) + '</span>\n';
+    const riskCls = data.summary.risk_level === 'CRITICAL' || data.summary.risk_level === 'HIGH' ? 'line-error' : data.summary.risk_level === 'MEDIUM' ? 'line-warn' : 'badge-found';
+    h += '<span class="line-key">  Risk Level:</span>     <span class="' + riskCls + '">' + escapeHtml(data.summary.risk_level || 'LOW') + '</span>\n\n';
   }
-  const fields = [
-    ['IP Address', geo.ip || data.ip],
-    ['Continent', geo.continent],
-    ['Country', geo.country],
-    ['Region', geo.region || geo.regionName],
-    ['City', geo.city],
-    ['ZIP', geo.zip],
-    ['Coordinates', geo.coordinates],
-    ['Timezone', geo.timezone],
-    ['ISP', geo.isp],
-    ['Organization', geo.organization || geo.org],
-    ['ASN', geo.asn],
-    ['ASN Name', geo.asn_name || geo.asname],
-    ['Reverse DNS', geo.reverse_dns],
-    ['Hostname', geo.hostname],
-    ['Is Proxy', geo.is_proxy],
-    ['Is Hosting', geo.is_hosting],
-    ['Is Mobile', geo.is_mobile],
-    ['Anycast', geo.anycast],
-  ];
-  fields.forEach(([label, val]) => {
-    if (val !== undefined && val !== null && val !== '' && val !== 'N/A' && val !== false && val !== 'Unknown') {
-      const display = typeof val === 'boolean' ? (val ? 'YES ⚠' : 'NO') : String(val);
-      h += '<span class="line-key">  ' + label.padEnd(16) + '</span> <span class="line-value">' + escapeHtml(display) + '</span>\n';
-    }
-  });
-  return h || '<span class="line-error">  Geolocation lookup failed</span>';
+  // IP & Risk
+  if (data.ip) h += '<span class="line-key">  IP Address:</span>    <span class="line-value">' + escapeHtml(data.ip) + '</span>\n';
+  if (data.risk_score !== undefined) h += '<span class="line-key">  Risk Score:</span>    <span class="line-value">' + data.risk_score + '/100</span>\n';
+  if (data.risk_level) {
+    const cls = data.risk_level === 'CRITICAL' || data.risk_level === 'HIGH' ? 'line-error' : data.risk_level === 'MEDIUM' ? 'line-warn' : 'badge-found';
+    h += '<span class="line-key">  Risk Level:</span>    <span class="' + cls + '">' + escapeHtml(data.risk_level) + '</span>\n';
+  }
+  // Hostnames
+  if (data.hostnames && data.hostnames.length > 0) {
+    h += '\n<span class="line-header">  HOSTNAMES (' + data.hostnames.length + ')</span>\n';
+    data.hostnames.forEach(function(host) {
+      h += '  <span class="line-value">  ├─ ' + escapeHtml(host) + '</span>\n';
+    });
+  }
+  // Open Ports
+  if (data.open_ports && data.open_ports.length > 0) {
+    h += '\n<span class="line-header">  OPEN PORTS (' + data.open_ports.length + ')</span>\n';
+    data.open_ports.forEach(function(port) {
+      const isCritical = data.exposed_critical_ports && data.exposed_critical_ports.includes(port);
+      const cls = isCritical ? 'line-error' : 'badge-found';
+      h += '  <span class="' + cls + '">  ⚡ Port ' + port + (isCritical ? ' ⚠ CRITICAL' : '') + '</span>\n';
+    });
+  }
+  // Exposed Critical Ports
+  if (data.exposed_critical_ports && data.exposed_critical_ports.length > 0) {
+    h += '\n<span class="line-header">  ⚠ EXPOSED CRITICAL PORTS</span>\n';
+    data.exposed_critical_ports.forEach(function(port) {
+      h += '  <span class="line-error">  ⚠ Port ' + port + ' — Critical service exposed</span>\n';
+    });
+  }
+  // Vulnerabilities
+  if (data.vulnerabilities && data.vulnerabilities.length > 0) {
+    h += '\n<span class="line-header">  ⚠ VULNERABILITIES (' + data.vulnerabilities.length + ')</span>\n';
+    data.vulnerabilities.forEach(function(cve) {
+      const isRecent = data.recent_cves && data.recent_cves.includes(cve);
+      const cls = isRecent ? 'line-error' : 'line-warn';
+      h += '  <span class="' + cls + '">  ⚠ ' + escapeHtml(cve) + (isRecent ? ' [RECENT]' : '') + '</span>\n';
+    });
+  }
+  // CPEs
+  if (data.cpes && data.cpes.length > 0) {
+    h += '\n<span class="line-header">  CPE IDENTIFIERS (' + data.cpes.length + ')</span>\n';
+    data.cpes.forEach(function(cpe) {
+      h += '  <span class="line-value">  ├─ ' + escapeHtml(cpe) + '</span>\n';
+    });
+  }
+  // Tags
+  if (data.tags && data.tags.length > 0) {
+    h += '\n<span class="line-key">  Tags:</span> <span class="line-value">' + escapeHtml(data.tags.join(', ')) + '</span>\n';
+  }
+  return h || '<span class="line-comment">  No Shodan data available</span>';
 }
 
-function renderRobots(data) {
+function renderInfoLeak(data) {
   let h = '';
-  // Backend returns data.robots_txt = { exists, raw, disallowed_paths, interesting_paths, ... }
-  const robots = data.robots_txt || data;
-  if (robots.exists || data['robots.txt']) {
-    h += '<span class="line-header">  robots.txt</span>\n';
-    if (robots.user_agents && robots.user_agents.length > 0) {
-      h += '<span class="line-key">  User-Agents:</span> <span class="line-value">' + escapeHtml(robots.user_agents.join(', ')) + '</span>\n';
-    }
-    if (robots.crawl_delay) {
-      h += '<span class="line-key">  Crawl-Delay:</span> <span class="line-value">' + escapeHtml(robots.crawl_delay) + '</span>\n';
-    }
-    if (robots.disallowed_paths && robots.disallowed_paths.length > 0) {
-      h += '\n<span class="line-header">  DISALLOWED PATHS (' + robots.disallowed_paths.length + ')</span>\n';
-      robots.disallowed_paths.forEach(p => {
-        h += '  <span class="line-value">  ├─ ' + escapeHtml(p) + '</span>\n';
-      });
-    }
-    if (robots.interesting_paths && robots.interesting_paths.length > 0) {
-      h += '\n<span class="line-header">  ⚠ INTERESTING PATHS</span>\n';
-      robots.interesting_paths.forEach(p => {
-        h += '  <span class="line-warn">  ⚠ ' + escapeHtml(p) + '</span>\n';
-      });
-    }
-    if (robots.raw) {
-      h += '\n<span class="line-header">  RAW</span>\n<span class="line-value">' + escapeHtml(robots.raw.substring(0, 2000)) + '</span>\n';
-    }
-  } else if (data['robots.txt']) {
-    h += '<span class="line-header">  robots.txt</span>\n<span class="line-value">' + escapeHtml(data['robots.txt']) + '</span>\n';
-  } else {
-    h += '<span class="line-comment">  No robots.txt found</span>\n';
+  // Summary
+  if (data.summary) {
+    h += '<span class="line-header">  INFORMATION LEAK SUMMARY</span>\n';
+    h += '<span class="line-key">  Leak Categories:</span> <span class="line-value">' + (data.summary.total_leak_categories || 0) + '</span>\n';
+    const riskCls = data.summary.risk_level === 'CRITICAL' || data.summary.risk_level === 'HIGH' ? 'line-error' : data.summary.risk_level === 'MEDIUM' ? 'line-warn' : 'badge-found';
+    h += '<span class="line-key">  Risk Level:</span>      <span class="' + riskCls + '">' + escapeHtml(data.summary.risk_level || 'LOW') + '</span>\n\n';
   }
-  // Sitemaps
-  const sitemaps = data.sitemaps || [];
-  if (sitemaps.length > 0) {
-    h += '\n<span class="line-header">  SITEMAPS</span>\n';
-    sitemaps.forEach(sm => {
-      h += '  <span class="badge-found">  ✓ ' + escapeHtml(sm.url || '') + ' (' + (sm.urls_count || 0) + ' URLs)</span>\n';
-      if (sm.sample_urls && sm.sample_urls.length > 0) {
-        sm.sample_urls.slice(0, 5).forEach(u => {
-          h += '    <span class="line-value">├─ ' + escapeHtml(u) + '</span>\n';
-        });
-      }
+  if (data.leaks_found !== undefined) h += '<span class="line-key">  Total Leaks:</span>     <span class="line-value">' + data.leaks_found + '</span>\n';
+  if (data.risk_score !== undefined) h += '<span class="line-key">  Risk Score:</span>      <span class="line-value">' + data.risk_score + '/100</span>\n';
+  if (data.risk_level) {
+    const cls = data.risk_level === 'CRITICAL' || data.risk_level === 'HIGH' ? 'line-error' : data.risk_level === 'MEDIUM' ? 'line-warn' : 'badge-found';
+    h += '<span class="line-key">  Risk Level:</span>      <span class="' + cls + '">' + escapeHtml(data.risk_level) + '</span>\n';
+  }
+  // Findings overview
+  if (data.findings && data.findings.length > 0) {
+    h += '\n<span class="line-header">  FINDINGS (' + data.findings.length + ')</span>\n';
+    data.findings.forEach(function(f) {
+      const cls = f.severity === 'CRITICAL' ? 'line-error' : f.severity === 'HIGH' ? 'line-error' : f.severity === 'MEDIUM' ? 'line-warn' : 'badge-found';
+      h += '  <span class="' + cls + '">  ⚠ [' + escapeHtml(f.severity || 'INFO') + '] ' + escapeHtml(f.type || '') + '</span>\n';
+      if (f.detail) h += '    <span class="line-sub">' + escapeHtml(f.detail) + '</span>\n';
+      if (f.count) h += '    <span class="line-comment">Count: ' + f.count + '</span>\n';
     });
-  } else if (data['sitemap.xml']) {
-    h += '\n<span class="line-header">  sitemap.xml</span>\n<span class="line-value">' + escapeHtml(data['sitemap.xml'].substring(0, 3000)) + '</span>\n';
   }
-  return h;
+  // HTML Comments
+  if (data.html_comments && data.html_comments.length > 0) {
+    h += '\n<span class="line-header">  HTML COMMENTS (' + data.html_comments.length + ')</span>\n';
+    data.html_comments.slice(0, 20).forEach(function(c) {
+      const cls = c.severity === 'HIGH' || c.severity === 'CRITICAL' ? 'line-error' : 'line-warn';
+      h += '  <span class="' + cls + '">  ⚠ ' + escapeHtml(c.content || '') + '</span>\n';
+      if (c.trigger) h += '    <span class="line-comment">Trigger: ' + escapeHtml(c.trigger) + '</span>\n';
+    });
+  }
+  // Meta Info
+  if (data.meta_info && data.meta_info.length > 0) {
+    h += '\n<span class="line-header">  META INFORMATION (' + data.meta_info.length + ')</span>\n';
+    data.meta_info.forEach(function(m) {
+      h += '  <span class="line-value">  ├─ ' + escapeHtml(m.name || '') + ': ' + escapeHtml(m.content || '') + '</span>\n';
+    });
+  }
+  // Exposed Emails
+  if (data.exposed_emails && data.exposed_emails.length > 0) {
+    h += '\n<span class="line-header">  ⚠ EXPOSED EMAILS (' + data.exposed_emails.length + ')</span>\n';
+    data.exposed_emails.forEach(function(e) {
+      h += '  <span class="line-warn">  ⚠ ' + escapeHtml(e) + '</span>\n';
+    });
+  }
+  // Exposed IPs
+  if (data.exposed_ips && data.exposed_ips.length > 0) {
+    h += '\n<span class="line-header">  ⚠ EXPOSED INTERNAL IPS (' + data.exposed_ips.length + ')</span>\n';
+    data.exposed_ips.forEach(function(ip) {
+      h += '  <span class="line-error">  ⚠ ' + escapeHtml(ip) + '</span>\n';
+    });
+  }
+  // Source Maps
+  if (data.source_maps && data.source_maps.length > 0) {
+    h += '\n<span class="line-header">  ⚠ SOURCE MAPS (' + data.source_maps.length + ')</span>\n';
+    data.source_maps.forEach(function(sm) {
+      h += '  <span class="line-warn">  ⚠ ' + escapeHtml(sm) + '</span>\n';
+    });
+  }
+  // Server Leaks
+  if (data.server_leaks && data.server_leaks.length > 0) {
+    h += '\n<span class="line-header">  SERVER INFORMATION LEAKS (' + data.server_leaks.length + ')</span>\n';
+    data.server_leaks.forEach(function(s) {
+      h += '  <span class="line-warn">  ⚠ ' + escapeHtml(s.header || '') + ': ' + escapeHtml(s.value || '') + '</span>\n';
+    });
+  }
+  // Error Disclosure
+  if (data.error_disclosure && data.error_disclosure.length > 0) {
+    h += '\n<span class="line-header">  ⚠ ERROR DISCLOSURE (' + data.error_disclosure.length + ')</span>\n';
+    data.error_disclosure.forEach(function(e) {
+      h += '  <span class="line-error">  ⚠ ' + escapeHtml(e.type || '') + ' at ' + escapeHtml(e.url || '') + ' (HTTP ' + (e.status || '') + ')</span>\n';
+    });
+  }
+  // Secrets Found
+  if (data.secrets_found && data.secrets_found.length > 0) {
+    h += '\n<span class="line-header">  ⚠ SECRETS DETECTED (' + data.secrets_found.length + ')</span>\n';
+    data.secrets_found.forEach(function(s) {
+      h += '  <span class="line-error">  ⚠ ' + escapeHtml(s.type || 'Secret') + ' (count: ' + (s.count || 1) + ')</span>\n';
+    });
+  }
+  return h || '<span class="line-comment">  No information leaks detected</span>';
 }
 
 // ────── RENDERERS (modules 12-25) ──────
@@ -848,25 +911,91 @@ function renderEmailSec(data) {
   return h || renderGeneric(data);
 }
 
-function renderTrace(data) {
+function renderWayback(data) {
   let h = '';
-  if (data.ip) h += '<span class="line-key">  Target IP:</span> <span class="line-value">' + escapeHtml(data.ip) + '</span>\n\n';
-  if (data.hops && Array.isArray(data.hops)) {
-    h += '<span class="badge-found">  ✓ ' + data.hops.length + ' hop(s) traced</span>\n\n';
-    data.hops.forEach((hop, i) => {
-      const num = String(hop.ttl || i + 1).padStart(2, '0');
-      h += '  <span class="line-key">  [' + num + ']</span> ';
-      h += '<span class="line-value">' + escapeHtml(hop.ip || '*').padEnd(20) + '</span>';
-      if (hop.rtt_ms !== undefined && hop.rtt_ms !== null) h += ' <span class="line-comment">' + hop.rtt_ms + ' ms</span>';
-      else if (hop.rtt) h += ' <span class="line-comment">' + escapeHtml(String(hop.rtt)) + '</span>';
-      if (hop.hostname && hop.hostname !== hop.ip && hop.hostname !== '* * *') h += ' <span class="badge-found">(' + escapeHtml(hop.hostname) + ')</span>';
-      h += '\n';
-    });
-    if (data.stats) {
-      h += '\n<span class="line-key">  Destination Reached:</span> <span class="' + (data.stats.destination_reached ? 'badge-found' : 'line-error') + '">' + (data.stats.destination_reached ? 'YES ✓' : 'NO ✗') + '</span>\n';
-    }
+  // Summary
+  if (data.summary) {
+    h += '<span class="line-header">  WAYBACK MACHINE SUMMARY</span>\n';
+    h += '<span class="line-key">  Archived URLs:</span>  <span class="line-value">' + (data.summary.total_archived_urls || 0) + '</span>\n';
+    h += '<span class="line-key">  API Endpoints:</span>  <span class="line-value">' + (data.summary.api_endpoints || 0) + '</span>\n';
+    if (data.summary.years_active) h += '<span class="line-key">  Years Active:</span>   <span class="line-value">' + escapeHtml(data.summary.years_active) + '</span>\n';
+    h += '\n';
   }
-  return h || renderGeneric(data);
+  if (data.total_urls_found !== undefined) h += '<span class="badge-found">  ✓ ' + data.total_urls_found + ' total URLs discovered</span>\n\n';
+  // Risk Findings
+  if (data.risk_findings && data.risk_findings.length > 0) {
+    h += '<span class="line-header">  ⚠ RISK FINDINGS</span>\n';
+    data.risk_findings.forEach(function(rf) {
+      const cls = rf.level === 'CRITICAL' ? 'line-error' : rf.level === 'HIGH' ? 'line-error' : rf.level === 'MEDIUM' ? 'line-warn' : 'badge-found';
+      h += '  <span class="' + cls + '">  ⚠ [' + escapeHtml(rf.level || '') + '] ' + escapeHtml(rf.finding || '') + '</span>\n';
+      if (rf.files && rf.files.length > 0) {
+        rf.files.forEach(function(f) {
+          h += '    <span class="line-sub">  ├─ ' + escapeHtml(f) + '</span>\n';
+        });
+      }
+    });
+    h += '\n';
+  }
+  // API Endpoints
+  if (data.api_endpoints && data.api_endpoints.length > 0) {
+    h += '<span class="line-header">  API ENDPOINTS (' + data.api_endpoints.length + ')</span>\n';
+    data.api_endpoints.slice(0, 30).forEach(function(ep) {
+      h += '  <span class="line-warn">  → ' + escapeHtml(ep) + '</span>\n';
+    });
+    if (data.api_endpoints.length > 30) h += '  <span class="line-comment">  └─ ... and ' + (data.api_endpoints.length - 30) + ' more</span>\n';
+    h += '\n';
+  }
+  // Config Files
+  if (data.config_files && data.config_files.length > 0) {
+    h += '<span class="line-header">  ⚠ CONFIG FILES (' + data.config_files.length + ')</span>\n';
+    data.config_files.forEach(function(f) {
+      h += '  <span class="line-error">  ⚠ ' + escapeHtml(f) + '</span>\n';
+    });
+    h += '\n';
+  }
+  // Admin Panels
+  if (data.admin_panels && data.admin_panels.length > 0) {
+    h += '<span class="line-header">  ⚠ ADMIN PANELS (' + data.admin_panels.length + ')</span>\n';
+    data.admin_panels.forEach(function(p) {
+      h += '  <span class="line-error">  ⚠ ' + escapeHtml(p) + '</span>\n';
+    });
+    h += '\n';
+  }
+  // JS Files
+  if (data.js_files && data.js_files.length > 0) {
+    h += '<span class="line-header">  JAVASCRIPT FILES (' + data.js_files.length + ')</span>\n';
+    data.js_files.slice(0, 20).forEach(function(f) {
+      h += '  <span class="line-value">  ├─ ' + escapeHtml(f) + '</span>\n';
+    });
+    if (data.js_files.length > 20) h += '  <span class="line-comment">  └─ ... and ' + (data.js_files.length - 20) + ' more</span>\n';
+    h += '\n';
+  }
+  // Unique Paths
+  if (data.unique_paths && data.unique_paths.length > 0) {
+    h += '<span class="line-header">  UNIQUE PATHS (' + data.unique_paths.length + ')</span>\n';
+    data.unique_paths.slice(0, 30).forEach(function(p) {
+      h += '  <span class="line-value">  ├─ ' + escapeHtml(p) + '</span>\n';
+    });
+    if (data.unique_paths.length > 30) h += '  <span class="line-comment">  └─ ... and ' + (data.unique_paths.length - 30) + ' more</span>\n';
+    h += '\n';
+  }
+  // Interesting Parameters
+  if (data.interesting_params && data.interesting_params.length > 0) {
+    h += '<span class="line-header">  INTERESTING PARAMETERS (' + data.interesting_params.length + ')</span>\n';
+    data.interesting_params.forEach(function(p) {
+      h += '  <span class="line-key">  ⬡</span> <span class="line-value">' + escapeHtml(p) + '</span>\n';
+    });
+    h += '\n';
+  }
+  // Timeline
+  if (data.timeline && Object.keys(data.timeline).length > 0) {
+    h += '<span class="line-header">  ARCHIVE TIMELINE</span>\n';
+    Object.entries(data.timeline).forEach(function([year, count]) {
+      const bar = '█'.repeat(Math.min(Math.ceil(count / 10), 30));
+      h += '  <span class="line-key">  ' + year + '</span> <span class="badge-found">' + bar + '</span> <span class="line-comment">' + count + ' URLs</span>\n';
+    });
+  }
+  return h || '<span class="line-comment">  No Wayback Machine data found</span>';
 }
 
 function renderCloud(data) {
@@ -916,109 +1045,186 @@ function renderWAF(data) {
   return h;
 }
 
-function renderJSAnalysis(data) {
+function renderThreatIntel(data) {
   let h = '';
-  if (data.scripts && data.scripts.length > 0) {
-    h += '<span class="badge-found">  ✓ ' + data.scripts.length + ' external script(s) found</span>\n\n';
-    data.scripts.forEach(s => { h += '  <span class="line-key">  ⬡</span> <span class="line-value">' + escapeHtml(s) + '</span>\n'; });
+  // Summary
+  if (data.summary) {
+    h += '<span class="line-header">  THREAT INTELLIGENCE SUMMARY</span>\n';
+    h += '<span class="line-key">  Threat Score:</span>     <span class="line-value">' + (data.summary.threat_score || 0) + '/100</span>\n';
+    h += '<span class="line-key">  Threat Pulses:</span>    <span class="line-value">' + (data.summary.total_threat_pulses || 0) + '</span>\n';
+    h += '<span class="line-key">  Malware Families:</span> <span class="line-value">' + (data.summary.malware_families || 0) + '</span>\n';
+    h += '<span class="line-key">  Attack Techniques:</span><span class="line-value"> ' + (data.summary.attack_techniques || 0) + '</span>\n\n';
   }
-  // Backend: data.api_endpoints (not data.apis)
-  const apis = data.api_endpoints || data.apis || [];
-  if (apis.length > 0) {
-    h += '\n<span class="line-header">  API ENDPOINTS (' + apis.length + ')</span>\n';
-    apis.forEach(a => { h += '  <span class="line-warn">  → ' + escapeHtml(typeof a === 'string' ? a : JSON.stringify(a)) + '</span>\n'; });
+  // Threat Score & Risk
+  if (data.threat_score !== undefined) {
+    const scoreCls = data.threat_score >= 75 ? 'line-error' : data.threat_score >= 40 ? 'line-warn' : 'badge-found';
+    h += '<span class="line-key">  Threat Score:</span>  <span class="' + scoreCls + '">' + data.threat_score + '/100</span>\n';
   }
-  // Backend: data.secrets_found (not data.secrets)
-  const secrets = data.secrets_found || data.secrets || [];
-  if (secrets.length > 0) {
-    h += '\n<span class="line-header">  ⚠ POTENTIAL SECRETS (' + secrets.length + ')</span>\n';
-    secrets.forEach(s => {
-      if (typeof s === 'object') {
-        h += '  <span class="line-error">  ⚠ [' + escapeHtml(s.severity || 'HIGH') + '] ' + escapeHtml(s.type || '') + ': ' + escapeHtml(s.value || '') + '</span>\n';
-      } else {
-        h += '  <span class="line-error">  ⚠ ' + escapeHtml(String(s)) + '</span>\n';
-      }
+  if (data.risk_level) {
+    const cls = data.risk_level === 'CRITICAL' || data.risk_level === 'HIGH' ? 'line-error' : data.risk_level === 'MEDIUM' ? 'line-warn' : 'badge-found';
+    h += '<span class="line-key">  Risk Level:</span>   <span class="' + cls + '">' + escapeHtml(data.risk_level) + '</span>\n';
+  }
+  if (data.whitelisted !== undefined) {
+    h += '<span class="line-key">  Whitelisted:</span>  <span class="' + (data.whitelisted ? 'badge-found' : 'line-comment') + '">' + (data.whitelisted ? 'YES ✓' : 'NO') + '</span>\n';
+  }
+  if (data.pulse_count !== undefined) h += '<span class="line-key">  Pulse Count:</span>  <span class="line-value">' + data.pulse_count + '</span>\n';
+  // Validation
+  if (data.validation && data.validation.length > 0) {
+    h += '\n<span class="line-header">  VALIDATION</span>\n';
+    data.validation.forEach(function(v) {
+      h += '  <span class="badge-found">  ✓ [' + escapeHtml(v.source || '') + '] ' + escapeHtml(v.message || '') + '</span>\n';
     });
   }
-  if (data.stats) {
-    const cls = data.stats.risk_level === 'CRITICAL' ? 'line-error' : data.stats.risk_level === 'HIGH' ? 'line-warn' : 'badge-found';
-    h += '\n<span class="line-key">  Risk Level:</span> <span class="' + cls + '">' + escapeHtml(data.stats.risk_level || 'LOW') + '</span>\n';
+  // Malware Families
+  if (data.malware_families && data.malware_families.length > 0) {
+    h += '\n<span class="line-header">  ⚠ MALWARE FAMILIES (' + data.malware_families.length + ')</span>\n';
+    data.malware_families.forEach(function(m) {
+      h += '  <span class="line-error">  ⚠ ' + escapeHtml(m) + '</span>\n';
+    });
   }
-  return h || renderGeneric(data);
+  // Attack Techniques
+  if (data.attack_techniques && data.attack_techniques.length > 0) {
+    h += '\n<span class="line-header">  ATTACK TECHNIQUES (' + data.attack_techniques.length + ')</span>\n';
+    data.attack_techniques.forEach(function(t) {
+      h += '  <span class="line-warn">  ⚡ ' + escapeHtml(t) + '</span>\n';
+    });
+  }
+  // Related Tags
+  if (data.related_tags && data.related_tags.length > 0) {
+    h += '\n<span class="line-key">  Related Tags:</span> <span class="line-value">' + escapeHtml(data.related_tags.join(', ')) + '</span>\n';
+  }
+  // Threat Pulses
+  if (data.pulses && data.pulses.length > 0) {
+    h += '\n<span class="line-header">  THREAT PULSES (' + data.pulses.length + ')</span>\n';
+    data.pulses.slice(0, 15).forEach(function(p) {
+      h += '  <span class="line-key">  ┌─ ' + escapeHtml(p.name || 'Unknown Pulse') + '</span>\n';
+      if (p.description) h += '    <span class="line-sub">  │ ' + escapeHtml(String(p.description).substring(0, 120)) + '</span>\n';
+      h += '    <span class="line-comment">  │ Author: ' + escapeHtml(p.author || '') + ' | Created: ' + escapeHtml(p.created || '') + '</span>\n';
+      h += '    <span class="line-comment">  │ Indicators: ' + (p.indicator_count || 0) + '</span>\n';
+      if (p.tags && p.tags.length > 0) h += '    <span class="line-comment">  │ Tags: ' + escapeHtml(p.tags.join(', ')) + '</span>\n';
+      h += '    <span class="line-value">  └─────────</span>\n\n';
+    });
+    if (data.pulses.length > 15) h += '  <span class="line-comment">  ... and ' + (data.pulses.length - 15) + ' more pulses</span>\n';
+  }
+  // Passive DNS
+  if (data.passive_dns && data.passive_dns.length > 0) {
+    h += '\n<span class="line-header">  PASSIVE DNS (' + data.passive_dns.length + ')</span>\n';
+    data.passive_dns.slice(0, 20).forEach(function(d) {
+      h += '  <span class="line-value">  ├─ ' + escapeHtml(d.hostname || '') + ' → ' + escapeHtml(d.address || '') + ' [' + escapeHtml(d.record_type || '') + ']</span>\n';
+      h += '    <span class="line-comment">  First: ' + escapeHtml(d.first || '') + ' | Last: ' + escapeHtml(d.last || '') + '</span>\n';
+    });
+    if (data.passive_dns.length > 20) h += '  <span class="line-comment">  └─ ... and ' + (data.passive_dns.length - 20) + ' more</span>\n';
+  }
+  return h || '<span class="line-comment">  No threat intelligence data available</span>';
 }
 
-function renderLinks(data) {
+function renderSensitivePaths(data) {
   let h = '';
-  // Backend: data.internal_links, data.external_links, data.forms, data.hidden_paths, data.emails
-  const sections = [
-    { key: 'internal_links', fallback: 'internal', label: 'INTERNAL LINKS' },
-    { key: 'external_links', fallback: 'external', label: 'EXTERNAL LINKS' },
-    { key: 'hidden_paths', fallback: null, label: '⚠ HIDDEN PATHS' },
-    { key: 'emails', fallback: null, label: 'EMAIL ADDRESSES' },
-  ];
-  sections.forEach(({ key, fallback, label }) => {
-    const items = data[key] || (fallback ? data[fallback] : null) || [];
-    if (items.length > 0) {
-      h += '<span class="line-header">  ' + label + ' (' + items.length + ')</span>\n';
-      items.slice(0, 30).forEach(l => {
-        const display = typeof l === 'string' ? l : JSON.stringify(l);
-        h += '  <span class="line-value">  ├─ ' + escapeHtml(display) + '</span>\n';
-      });
-      if (items.length > 30) h += '  <span class="line-comment">  └─ ... and ' + (items.length - 30) + ' more</span>\n';
-      h += '\n';
+  // Summary
+  if (data.summary) {
+    h += '<span class="line-header">  SENSITIVE PATHS SUMMARY</span>\n';
+    h += '<span class="line-key">  Paths Tested:</span>  <span class="line-value">' + (data.summary.total_paths_tested || 0) + '</span>\n';
+    h += '<span class="line-key">  Paths Found:</span>   <span class="line-value">' + (data.summary.total_found || 0) + '</span>\n';
+    const riskCls = data.summary.risk_level === 'CRITICAL' || data.summary.risk_level === 'HIGH' ? 'line-error' : data.summary.risk_level === 'MEDIUM' ? 'line-warn' : 'badge-found';
+    h += '<span class="line-key">  Risk Level:</span>    <span class="' + riskCls + '">' + escapeHtml(data.summary.risk_level || 'LOW') + '</span>\n';
+    // Severity breakdown
+    if (data.summary.severity_breakdown) {
+      h += '\n<span class="line-header">  SEVERITY BREAKDOWN</span>\n';
+      var sb = data.summary.severity_breakdown;
+      if (sb.CRITICAL) h += '  <span class="line-error">  ⚠ CRITICAL: ' + sb.CRITICAL + '</span>\n';
+      if (sb.HIGH) h += '  <span class="line-error">  ⚠ HIGH:     ' + sb.HIGH + '</span>\n';
+      if (sb.MEDIUM) h += '  <span class="line-warn">  ● MEDIUM:   ' + sb.MEDIUM + '</span>\n';
+      if (sb.LOW) h += '  <span class="badge-found">  ○ LOW:      ' + sb.LOW + '</span>\n';
     }
-  });
-  // Forms
-  const forms = data.forms || [];
-  if (forms.length > 0) {
-    h += '<span class="line-header">  FORMS (' + forms.length + ')</span>\n';
-    forms.forEach((f, i) => {
-      h += '  <span class="line-key">  [' + (i + 1) + '] ' + escapeHtml(f.method || 'GET') + '</span> <span class="line-value">' + escapeHtml(f.action || '') + '</span>\n';
-      if (f.inputs && f.inputs.length > 0) {
-        f.inputs.forEach(inp => {
-          h += '    <span class="line-comment">  ├─ ' + escapeHtml(inp.name || '(no name)') + ' [' + escapeHtml(inp.type || 'text') + ']</span>\n';
-        });
-      }
-    });
+    h += '\n';
   }
-  return h || renderGeneric(data);
+  // Stats
+  if (data.total_tested !== undefined) h += '<span class="line-key">  Total Tested:</span> <span class="line-value">' + data.total_tested + ' paths</span>\n';
+  if (data.total_found !== undefined) h += '<span class="line-key">  Total Found:</span>  <span class="badge-found">' + data.total_found + ' accessible</span>\n';
+  if (data.risk_score !== undefined) h += '<span class="line-key">  Risk Score:</span>   <span class="line-value">' + data.risk_score + '/100</span>\n';
+  if (data.risk_level) {
+    const cls = data.risk_level === 'CRITICAL' || data.risk_level === 'HIGH' ? 'line-error' : data.risk_level === 'MEDIUM' ? 'line-warn' : 'badge-found';
+    h += '<span class="line-key">  Risk Level:</span>   <span class="' + cls + '">' + escapeHtml(data.risk_level) + '</span>\n';
+  }
+  // Findings
+  if (data.findings && data.findings.length > 0) {
+    h += '\n<span class="line-header">  DISCOVERED PATHS (' + data.findings.length + ')</span>\n';
+    data.findings.forEach(function(f) {
+      const sevCls = f.severity === 'CRITICAL' ? 'line-error' : f.severity === 'HIGH' ? 'line-error' : f.severity === 'MEDIUM' ? 'line-warn' : 'badge-found';
+      h += '  <span class="' + sevCls + '">  ⚠ [' + escapeHtml(f.severity || 'INFO') + '] ' + escapeHtml(f.path || '') + '</span>\n';
+      h += '    <span class="line-sub">  Status: ' + (f.status || '') + ' | Size: ' + (f.size || 0) + ' bytes | Category: ' + escapeHtml(f.category || '') + '</span>\n';
+      if (f.description) h += '    <span class="line-comment">  ' + escapeHtml(f.description) + '</span>\n';
+      h += '\n';
+    });
+  } else {
+    h += '\n<span class="line-comment">  No sensitive paths discovered</span>\n';
+  }
+  return h || '<span class="line-comment">  No sensitive paths data available</span>';
 }
 
-function renderCMS(data) {
+function renderCveHunter(data) {
   let h = '';
-  // Backend: data.cms, data.version, data.details = { paths_found, themes, plugins, users_exposed }, data.vulnerabilities
-  h += '<span class="line-key">  CMS Detected:</span> <span class="' + (data.cms !== 'Unknown' ? 'badge-found' : 'badge-missing') + '">' + escapeHtml(data.cms || 'Unknown') + '</span>\n';
-  if (data.version && data.version !== 'Unknown') h += '<span class="line-key">  Version:</span>      <span class="line-value">' + escapeHtml(data.version) + '</span>\n';
-  const details = data.details || {};
-  if (details.paths_found && details.paths_found.length > 0) {
-    h += '\n<span class="line-header">  DETECTED PATHS</span>\n';
-    details.paths_found.forEach(p => { h += '  <span class="line-value">  ├─ ' + escapeHtml(p) + '</span>\n'; });
+  // Summary
+  if (data.summary) {
+    h += '<span class="line-header">  CVE HUNTER SUMMARY</span>\n';
+    h += '<span class="line-key">  Total CVEs:</span>   <span class="line-value">' + (data.summary.total_cves || 0) + '</span>\n';
+    if (data.summary.critical !== undefined) h += '<span class="line-key">  Critical:</span>     <span class="line-error">' + data.summary.critical + '</span>\n';
+    if (data.summary.high !== undefined) h += '<span class="line-key">  High:</span>         <span class="line-warn">' + data.summary.high + '</span>\n';
+    if (data.summary.exploitable !== undefined) h += '<span class="line-key">  Exploitable:</span>  <span class="line-error">' + data.summary.exploitable + '</span>\n';
+    const riskCls = data.summary.risk_level === 'CRITICAL' ? 'line-error' : data.summary.risk_level === 'HIGH' ? 'line-error' : data.summary.risk_level === 'MEDIUM' ? 'line-warn' : 'badge-found';
+    h += '<span class="line-key">  Risk Level:</span>   <span class="' + riskCls + '">' + escapeHtml(data.summary.risk_level || 'LOW') + '</span>\n\n';
   }
-  // themes/plugins from details or top-level
-  const themes = details.themes || data.themes || [];
-  const plugins = details.plugins || data.plugins || [];
-  if (themes.length > 0) {
-    h += '\n<span class="line-header">  THEMES (' + themes.length + ')</span>\n';
-    themes.forEach(t => { h += '  <span class="line-value">  ├─ ' + escapeHtml(t) + '</span>\n'; });
+  // Basic info
+  if (data.ip) h += '<span class="line-key">  Target IP:</span>    <span class="line-value">' + escapeHtml(data.ip) + '</span>\n';
+  if (data.total_cves !== undefined) h += '<span class="line-key">  Total CVEs:</span>   <span class="line-value">' + data.total_cves + '</span>\n';
+  if (data.risk_score !== undefined) h += '<span class="line-key">  Risk Score:</span>   <span class="line-value">' + data.risk_score + '/100</span>\n';
+  if (data.risk_level) {
+    const cls = data.risk_level === 'CRITICAL' ? 'line-error' : data.risk_level === 'HIGH' ? 'line-error' : data.risk_level === 'MEDIUM' ? 'line-warn' : 'badge-found';
+    h += '<span class="line-key">  Risk Level:</span>   <span class="' + cls + '">' + escapeHtml(data.risk_level) + '</span>\n';
   }
-  if (plugins.length > 0) {
-    h += '\n<span class="line-header">  PLUGINS (' + plugins.length + ')</span>\n';
-    plugins.forEach(p => { h += '  <span class="line-value">  ├─ ' + escapeHtml(p) + '</span>\n'; });
+  // Severity Breakdown
+  if (data.severity_breakdown) {
+    h += '\n<span class="line-header">  SEVERITY BREAKDOWN</span>\n';
+    var sb = data.severity_breakdown;
+    if (sb.CRITICAL) h += '  <span class="line-error">  ⚠ CRITICAL: ' + sb.CRITICAL + '</span>\n';
+    if (sb.HIGH) h += '  <span class="line-error">  ⚠ HIGH:     ' + sb.HIGH + '</span>\n';
+    if (sb.MEDIUM) h += '  <span class="line-warn">  ● MEDIUM:   ' + sb.MEDIUM + '</span>\n';
+    if (sb.LOW) h += '  <span class="badge-found">  ○ LOW:      ' + sb.LOW + '</span>\n';
+    if (sb.UNKNOWN) h += '  <span class="line-comment">  ? UNKNOWN:  ' + sb.UNKNOWN + '</span>\n';
   }
-  if (details.users_exposed && details.users_exposed.length > 0) {
-    h += '\n<span class="line-header">  ⚠ EXPOSED USERS</span>\n';
-    details.users_exposed.forEach(u => {
-      h += '  <span class="line-error">  ⚠ ' + escapeHtml(u.name || '') + ' (' + escapeHtml(u.slug || '') + ')</span>\n';
+  // Exploitable CVEs
+  if (data.exploitable && data.exploitable.length > 0) {
+    h += '\n<span class="line-header">  ⚠ EXPLOITABLE CVES (' + data.exploitable.length + ')</span>\n';
+    data.exploitable.forEach(function(cve) {
+      h += '  <span class="line-error">  ⚠ ' + escapeHtml(cve) + ' — Known exploit available</span>\n';
     });
   }
-  if (data.vulnerabilities && data.vulnerabilities.length > 0) {
-    h += '\n<span class="line-header">  ⚠ VULNERABILITIES</span>\n';
-    data.vulnerabilities.forEach(v => {
-      h += '  <span class="line-error">  ⚠ [' + escapeHtml(v.severity || '') + '] ' + escapeHtml(v.type || '') + '</span>\n';
-      if (v.detail) h += '    <span class="line-sub">' + escapeHtml(v.detail) + '</span>\n';
+  // Detailed CVE List
+  if (data.cve_details && data.cve_details.length > 0) {
+    h += '\n<span class="line-header">  CVE DETAILS (' + data.cve_details.length + ')</span>\n';
+    data.cve_details.forEach(function(cve) {
+      const sevCls = cve.severity === 'CRITICAL' ? 'line-error' : cve.severity === 'HIGH' ? 'line-error' : cve.severity === 'MEDIUM' ? 'line-warn' : cve.severity === 'LOW' ? 'badge-found' : 'line-comment';
+      h += '  <span class="' + sevCls + '">  ┌─ ' + escapeHtml(cve.id || '') + ' [' + escapeHtml(cve.severity || 'UNKNOWN') + ']</span>\n';
+      if (cve.cvss !== undefined) h += '    <span class="line-sub">  │ CVSS: ' + cve.cvss + '/10.0</span>\n';
+      if (cve.summary) h += '    <span class="line-sub">  │ ' + escapeHtml(String(cve.summary).substring(0, 150)) + '</span>\n';
+      if (cve.cwe) h += '    <span class="line-comment">  │ CWE: ' + escapeHtml(cve.cwe) + '</span>\n';
+      if (cve.published) h += '    <span class="line-comment">  │ Published: ' + escapeHtml(cve.published) + '</span>\n';
+      h += '    <span class="line-value">  └─────────</span>\n\n';
+    });
+  } else if (data.cve_list && data.cve_list.length > 0) {
+    h += '\n<span class="line-header">  CVE LIST (' + data.cve_list.length + ')</span>\n';
+    data.cve_list.forEach(function(cve) {
+      h += '  <span class="line-warn">  ⚠ ' + escapeHtml(cve) + '</span>\n';
     });
   }
-  return h;
+  // CPEs
+  if (data.cpes && data.cpes.length > 0) {
+    h += '\n<span class="line-header">  CPE IDENTIFIERS (' + data.cpes.length + ')</span>\n';
+    data.cpes.forEach(function(cpe) {
+      h += '  <span class="line-value">  ├─ ' + escapeHtml(cpe) + '</span>\n';
+    });
+  }
+  return h || '<span class="line-comment">  No CVE data available</span>';
 }
 
 function renderCORS(data) {

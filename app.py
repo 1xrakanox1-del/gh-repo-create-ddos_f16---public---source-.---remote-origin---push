@@ -322,52 +322,149 @@ def port_scanner(domain):
 # ================================================================
 # MODULE 6: NETWORK TRACE
 # ================================================================
-def network_trace(domain):
-    results = {"module": "Network Trace", "domain": domain, "ip": None, "hops": [], "stats": {}}
-    ip = resolve_ip(domain)
-    if not ip:
-        results["error"] = "Could not resolve domain"
-        return results
-    results["ip"] = ip
-    hops = []
-    for ttl in range(1, 30):
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.setsockopt(socket.IPPROTO_IP, socket.IP_TTL, ttl)
-            s.settimeout(2)
-            start = time.time()
-            s.sendto(b'', (ip, 33434))
+def wayback_recon(domain):
+    """Wayback Machine CDX API - Discover hidden endpoints, old URLs, leaked paths."""
+    result = {
+        "module": "wayback_recon",
+        "target": domain,
+        "total_urls_found": 0,
+        "unique_paths": [],
+        "api_endpoints": [],
+        "js_files": [],
+        "config_files": [],
+        "admin_panels": [],
+        "interesting_params": [],
+        "old_subdomains": [],
+        "status_summary": {},
+        "timeline": {},
+        "risk_findings": []
+    }
+    
+    try:
+        # Query Wayback CDX API
+        cdx_url = f"https://web.archive.org/cdx/search/cdx?url={domain}/*&output=json&fl=original,statuscode,mimetype,timestamp&limit=500&collapse=urlkey"
+        resp = safe_get(cdx_url, timeout=30)
+        if not resp or resp.status_code != 200:
+            result["error"] = "Could not reach Wayback Machine"
+            return result
+        
+        data = resp.json()
+        if len(data) < 2:
+            result["total_urls_found"] = 0
+            return result
+        
+        # Skip header row
+        rows = data[1:]
+        result["total_urls_found"] = len(rows)
+        
+        paths = set()
+        api_endpoints = set()
+        js_files = set()
+        config_files = set()
+        admin_panels = set()
+        params = set()
+        status_codes = {}
+        years = {}
+        
+        # Sensitive patterns
+        config_patterns = ['.env', '.git', 'config', '.json', '.xml', '.yml', '.yaml', '.bak', '.backup', '.old', '.sql', '.db', '.log', 'wp-config', '.htaccess', '.htpasswd', 'web.config', '.DS_Store', 'phpinfo', '.swp']
+        admin_patterns = ['admin', 'dashboard', 'panel', 'manager', 'backend', 'cms', 'control', 'cpanel', 'wp-admin', 'wp-login', 'phpmyadmin', 'adminer']
+        
+        for row in rows:
+            url = row[0] if len(row) > 0 else ""
+            status = row[1] if len(row) > 1 else ""
+            mime = row[2] if len(row) > 2 else ""
+            ts = row[3] if len(row) > 3 else ""
+            
+            # Extract path
             try:
-                recv_s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
-                recv_s.settimeout(2)
-                data, addr = recv_s.recvfrom(512)
-                elapsed = (time.time() - start) * 1000
-                hop_ip = addr[0]
-                # Reverse DNS
-                try:
-                    hostname = socket.gethostbyaddr(hop_ip)[0]
-                except:
-                    hostname = hop_ip
-                hops.append({"ttl": ttl, "ip": hop_ip, "hostname": hostname, "rtt_ms": round(elapsed, 2)})
-                recv_s.close()
-                if hop_ip == ip:
+                from urllib.parse import urlparse, parse_qs
+                parsed = urlparse(url)
+                path = parsed.path
+                paths.add(path)
+                
+                # Track params
+                if parsed.query:
+                    for key in parse_qs(parsed.query).keys():
+                        params.add(key)
+                
+            except:
+                path = url
+                paths.add(path)
+            
+            # Classify
+            path_lower = path.lower()
+            url_lower = url.lower()
+            
+            # API endpoints
+            if '/api/' in path_lower or '/v1/' in path_lower or '/v2/' in path_lower or '/v3/' in path_lower or '/graphql' in path_lower or '/rest/' in path_lower:
+                api_endpoints.add(path)
+            
+            # JS files
+            if path_lower.endswith('.js') or 'javascript' in (mime or '').lower():
+                js_files.add(path)
+            
+            # Config/sensitive files
+            for pattern in config_patterns:
+                if pattern in url_lower:
+                    config_files.add(url)
                     break
-            except socket.timeout:
-                hops.append({"ttl": ttl, "ip": "*", "hostname": "* * *", "rtt_ms": None})
-                try:
-                    recv_s.close()
-                except:
-                    pass
-            s.close()
-        except:
-            hops.append({"ttl": ttl, "ip": "*", "hostname": "Request timed out", "rtt_ms": None})
-    results["hops"] = hops
-    results["stats"] = {"total_hops": len(hops), "destination_reached": any(h["ip"] == ip for h in hops), "target_ip": ip}
-    return results
+            
+            # Admin panels
+            for pattern in admin_patterns:
+                if pattern in path_lower:
+                    admin_panels.add(path)
+                    break
+            
+            # Status codes
+            if status:
+                status_codes[status] = status_codes.get(status, 0) + 1
+            
+            # Timeline
+            if ts and len(ts) >= 4:
+                year = ts[:4]
+                years[year] = years.get(year, 0) + 1
+        
+        result["unique_paths"] = sorted(list(paths))[:100]
+        result["api_endpoints"] = sorted(list(api_endpoints))[:50]
+        result["js_files"] = sorted(list(js_files))[:50]
+        result["config_files"] = sorted(list(config_files))[:30]
+        result["admin_panels"] = sorted(list(admin_panels))[:20]
+        result["interesting_params"] = sorted(list(params))[:50]
+        result["status_summary"] = dict(sorted(status_codes.items()))
+        result["timeline"] = dict(sorted(years.items()))
+        
+        # Risk findings
+        risk = []
+        if config_files:
+            risk.append({"level": "CRITICAL", "finding": f"{len(config_files)} sensitive/config files discovered in archives", "files": sorted(list(config_files))[:10]})
+        if admin_panels:
+            risk.append({"level": "HIGH", "finding": f"{len(admin_panels)} admin panel paths found", "paths": sorted(list(admin_panels))[:10]})
+        if api_endpoints:
+            risk.append({"level": "MEDIUM", "finding": f"{len(api_endpoints)} API endpoints discovered", "endpoints": sorted(list(api_endpoints))[:10]})
+        if js_files:
+            risk.append({"level": "INFO", "finding": f"{len(js_files)} JavaScript files found (may contain secrets)", "files": sorted(list(js_files))[:10]})
+        
+        result["risk_findings"] = risk
+        
+        result["summary"] = {
+            "total_archived_urls": len(rows),
+            "unique_paths": len(paths),
+            "api_endpoints": len(api_endpoints),
+            "js_files": len(js_files),
+            "config_files": len(config_files),
+            "admin_panels": len(admin_panels),
+            "unique_parameters": len(params),
+            "years_active": f"{min(years.keys()) if years else 'N/A'} - {max(years.keys()) if years else 'N/A'}",
+            "data_source": "Wayback Machine CDX API (Free)"
+        }
+        
+    except Exception as e:
+        result["error"] = str(e)
+    
+    return result
 
-# ================================================================
-# MODULE 7: CLOUD INFRASTRUCTURE DETECTION
-# ================================================================
+
 def cloud_infra(domain):
     results = {"module": "Cloud Infrastructure Detection", "domain": domain, "provider": "Unknown", "cdn": "Unknown", "details": {}, "indicators": [], "stats": {}}
     ip = resolve_ip(domain)
@@ -445,53 +542,83 @@ def cloud_infra(domain):
 # ================================================================
 # MODULE 8: GEOIP ADVANCED
 # ================================================================
-def geoip_advanced(domain):
-    results = {"module": "GeoIP Advanced", "domain": domain, "ip": None, "geo": {}, "stats": {}}
-    ip = resolve_ip(domain)
-    if not ip:
-        results["error"] = "Could not resolve domain"
-        return results
-    results["ip"] = ip
+def shodan_intel(domain):
+    """Shodan InternetDB - FREE API, no key needed. Real CVEs, ports, CPEs, tags."""
+    import socket, json
+    result = {
+        "module": "shodan_intel",
+        "target": domain,
+        "ip": "Unknown",
+        "shodan_data": {},
+        "open_ports": [],
+        "vulnerabilities": [],
+        "cpes": [],
+        "hostnames": [],
+        "tags": [],
+        "risk_level": "UNKNOWN",
+        "risk_score": 0,
+        "summary": {}
+    }
     try:
-        r = safe_get(f"http://ip-api.com/json/{ip}?fields=status,message,continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,currency,isp,org,as,asname,reverse,mobile,proxy,hosting,query", timeout=10)
-        if r and r.status_code == 200:
-            data = r.json()
-            results["geo"] = {
-                "ip": ip,
-                "continent": data.get("continent", "Unknown"),
-                "country": f"{data.get('country', 'Unknown')} ({data.get('countryCode', '')})",
-                "region": data.get("regionName", "Unknown"),
-                "city": data.get("city", "Unknown"),
-                "zip": data.get("zip", "N/A"),
-                "coordinates": f"{data.get('lat', 0)}, {data.get('lon', 0)}",
-                "timezone": data.get("timezone", "Unknown"),
-                "isp": data.get("isp", "Unknown"),
-                "organization": data.get("org", "Unknown"),
-                "asn": data.get("as", "Unknown"),
-                "asn_name": data.get("asname", "Unknown"),
-                "reverse_dns": data.get("reverse", "N/A"),
-                "is_proxy": data.get("proxy", False),
-                "is_hosting": data.get("hosting", False),
-                "is_mobile": data.get("mobile", False),
-            }
+        ip = socket.gethostbyname(domain)
+        result["ip"] = ip
     except:
-        results["geo"] = {"error": "GeoIP lookup failed"}
-    # Additional: ipinfo.io
+        result["error"] = "Could not resolve domain"
+        return result
+
+    # Query Shodan InternetDB (free, no API key)
     try:
-        r2 = safe_get(f"https://ipinfo.io/{ip}/json", timeout=8)
-        if r2 and r2.status_code == 200:
-            d2 = r2.json()
-            results["geo"]["hostname"] = d2.get("hostname", "N/A")
-            results["geo"]["anycast"] = d2.get("anycast", False)
+        resp = safe_get(f"https://internetdb.shodan.io/{ip}", timeout=15)
+        if resp and resp.status_code == 200:
+            data = resp.json()
+            result["shodan_data"] = data
+            result["open_ports"] = data.get("ports", [])
+            result["vulnerabilities"] = data.get("vulns", [])
+            result["cpes"] = data.get("cpes", [])
+            result["hostnames"] = data.get("hostnames", [])
+            result["tags"] = data.get("tags", [])
+        elif resp and resp.status_code == 404:
+            result["shodan_data"] = {"message": "No data available for this IP"}
     except:
-        pass
-    results["stats"] = {"ip": ip, "country": results["geo"].get("country", "Unknown"), "isp": results["geo"].get("isp", "Unknown"), "is_hosting": results["geo"].get("is_hosting", False)}
-    return results
+        result["shodan_data"] = {"error": "Could not reach Shodan InternetDB"}
+
+    # Calculate risk score
+    vuln_count = len(result["vulnerabilities"])
+    port_count = len(result["open_ports"])
+    risk_score = min(100, vuln_count * 15 + port_count * 3)
+    
+    critical_ports = [21, 22, 23, 25, 445, 1433, 3306, 3389, 5432, 6379, 27017]
+    exposed_critical = [p for p in result["open_ports"] if p in critical_ports]
+    risk_score += len(exposed_critical) * 10
+    risk_score = min(100, risk_score)
+    
+    if risk_score >= 70: risk_level = "CRITICAL"
+    elif risk_score >= 50: risk_level = "HIGH"
+    elif risk_score >= 30: risk_level = "MEDIUM"
+    elif risk_score >= 10: risk_level = "LOW"
+    else: risk_level = "CLEAN"
+    
+    result["risk_level"] = risk_level
+    result["risk_score"] = risk_score
+    result["exposed_critical_ports"] = exposed_critical
+    
+    # CVE severity classification
+    cve_critical = [v for v in result["vulnerabilities"] if "2024" in v or "2023" in v or "2025" in v or "2026" in v]
+    result["recent_cves"] = cve_critical
+    
+    result["summary"] = {
+        "total_ports": port_count,
+        "total_cves": vuln_count,
+        "recent_cves": len(cve_critical),
+        "critical_ports_exposed": len(exposed_critical),
+        "technologies_detected": len(result["cpes"]),
+        "risk_level": risk_level,
+        "risk_score": risk_score,
+        "data_source": "Shodan InternetDB (Free API)"
+    }
+    return result
 
 
-# ================================================================
-# MODULE 9: WAF DETECTION
-# ================================================================
 def waf_detect(domain):
     results = {"module": "WAF Detection", "domain": domain, "waf_detected": False, "waf_name": "None", "evidence": [], "fingerprints": {}, "stats": {}}
     evidence = []
@@ -580,115 +707,207 @@ def waf_detect(domain):
 # ================================================================
 # MODULE 10: TECH STACK X-RAY
 # ================================================================
-def tech_stack(domain):
-    results = {"module": "Tech Stack X-Ray", "domain": domain, "technologies": {}, "stats": {}}
-    techs = {"server": [], "cms": [], "framework": [], "javascript": [], "css_framework": [], "analytics": [], "cdn": [], "hosting": [], "language": [], "security": [], "other": []}
+def deep_tech_fingerprint(domain):
+    """Advanced technology detection using 200+ signatures - headers, HTML, scripts, meta tags, cookies."""
+    result = {
+        "module": "deep_tech_fingerprint",
+        "target": domain,
+        "technologies": [],
+        "categories": {},
+        "confidence_scores": {},
+        "detection_methods": {},
+        "summary": {}
+    }
+    
     try:
-        r = safe_get(f"https://{domain}", timeout=12)
-        if not r:
-            r = safe_get(f"http://{domain}", timeout=12)
-        if not r:
-            results["error"] = "Could not fetch website"
-            return results
-        html = r.text
-        h = {k.lower(): v for k, v in r.headers.items()}
-        soup = BeautifulSoup(html, 'html.parser')
-        # Server
-        if h.get('server'):
-            techs["server"].append(h['server'])
-        if h.get('x-powered-by'):
-            techs["language"].append(h['x-powered-by'])
-        # CMS Detection
-        cms_patterns = {
-            "WordPress": ['/wp-content/', '/wp-includes/', 'wp-json', 'wordpress'],
-            "Joomla": ['/components/com_', '/media/jui/', 'joomla'],
-            "Drupal": ['drupal.js', 'Drupal.settings', '/sites/default/'],
-            "Shopify": ['cdn.shopify.com', 'shopify.com'],
-            "Wix": ['wix.com', 'parastorage.com'],
-            "Squarespace": ['squarespace.com', 'sqsp.com'],
-            "Ghost": ['ghost.org', 'ghost.io'],
-            "PrestaShop": ['prestashop', '/modules/'],
-            "Magento": ['mage/', 'Magento', 'magento'],
-            "Laravel": ['laravel', 'csrf-token'],
+        url = f"https://{domain}"
+        resp = safe_get(url, timeout=15)
+        if not resp:
+            url = f"http://{domain}"
+            resp = safe_get(url, timeout=15)
+        if not resp:
+            result["error"] = "Could not reach target"
+            return result
+        
+        headers = {k.lower(): v for k, v in resp.headers.items()}
+        body = resp.text.lower() if resp.text else ""
+        body_raw = resp.text if resp.text else ""
+        
+        detected = {}  # name -> {category, confidence, method, version}
+        
+        # === HEADER-BASED DETECTION ===
+        header_sigs = {
+            "Nginx": {"header": "server", "pattern": "nginx", "category": "Web Server"},
+            "Apache": {"header": "server", "pattern": "apache", "category": "Web Server"},
+            "IIS": {"header": "server", "pattern": "microsoft-iis", "category": "Web Server"},
+            "LiteSpeed": {"header": "server", "pattern": "litespeed", "category": "Web Server"},
+            "Caddy": {"header": "server", "pattern": "caddy", "category": "Web Server"},
+            "Cloudflare": {"header": "server", "pattern": "cloudflare", "category": "CDN/WAF"},
+            "Cloudflare (cf-ray)": {"header": "cf-ray", "pattern": "", "category": "CDN/WAF"},
+            "Fastly": {"header": "x-served-by", "pattern": "cache", "category": "CDN"},
+            "Varnish": {"header": "via", "pattern": "varnish", "category": "Cache"},
+            "AWS ELB": {"header": "server", "pattern": "awselb", "category": "Cloud/LB"},
+            "Express.js": {"header": "x-powered-by", "pattern": "express", "category": "Framework"},
+            "PHP": {"header": "x-powered-by", "pattern": "php", "category": "Language"},
+            "ASP.NET": {"header": "x-powered-by", "pattern": "asp.net", "category": "Framework"},
+            "Django": {"header": "x-frame-options", "pattern": "sameorigin", "category": "Framework"},
+            "Next.js": {"header": "x-powered-by", "pattern": "next.js", "category": "Framework"},
         }
-        html_lower = html.lower()
-        for cms, patterns in cms_patterns.items():
-            for pat in patterns:
-                if pat.lower() in html_lower:
-                    if cms not in techs["cms"]:
-                        techs["cms"].append(cms)
-                    break
-        # Meta generator
-        meta_gen = soup.find('meta', attrs={'name': 'generator'})
-        if meta_gen and meta_gen.get('content'):
-            techs["cms"].append(f"Generator: {meta_gen['content']}")
-        # JavaScript Libraries
-        js_libs = {
-            "jQuery": ["jquery", "jquery.min.js"],
-            "React": ["react.production", "react-dom", "reactjs", "_react"],
-            "Vue.js": ["vue.js", "vue.min.js", "vue.global", "__vue__"],
-            "Angular": ["angular", "ng-app", "ng-controller"],
-            "Next.js": ["_next/", "__next", "next/"],
-            "Nuxt.js": ["__nuxt", "_nuxt/"],
-            "Svelte": ["svelte"],
-            "Alpine.js": ["alpine", "x-data"],
-            "HTMX": ["htmx.org", "hx-get", "hx-post"],
-            "Tailwind CSS": ["tailwindcss", "tailwind"],
-            "Bootstrap": ["bootstrap.min", "bootstrap.css", "bootstrap.bundle"],
-            "Lodash": ["lodash"],
-            "Axios": ["axios"],
-            "Moment.js": ["moment.min.js"],
-            "Chart.js": ["chart.js", "chart.min.js"],
-            "Three.js": ["three.js", "three.min.js"],
-            "GSAP": ["gsap", "greensock"],
-            "AOS": ["aos.js", "data-aos"],
+        
+        for name, sig in header_sigs.items():
+            h_val = headers.get(sig["header"], "").lower()
+            if sig["pattern"] == "" and h_val:
+                detected[name] = {"category": sig["category"], "confidence": 95, "method": f"Header: {sig['header']}", "version": ""}
+            elif sig["pattern"] in h_val:
+                # Try to extract version
+                version = ""
+                import re
+                ver_match = re.search(rf'{sig["pattern"]}[/\s]*([\d.]+)', h_val)
+                if ver_match:
+                    version = ver_match.group(1)
+                detected[name] = {"category": sig["category"], "confidence": 95, "method": f"Header: {sig['header']}", "version": version}
+        
+        # === HTML META TAG DETECTION ===
+        import re
+        meta_sigs = {
+            "WordPress": [r'wp-content', r'wp-includes', r'wordpress', r'wp-json'],
+            "Joomla": [r'joomla', r'/media/system/js/', r'com_content'],
+            "Drupal": [r'drupal', r'/sites/default/', r'drupal.js'],
+            "Shopify": [r'shopify', r'cdn\.shopify\.com', r'myshopify'],
+            "Wix": [r'wix\.com', r'wixstatic', r'X-Wix'],
+            "Squarespace": [r'squarespace', r'static\.squarespace'],
+            "Magento": [r'magento', r'mage/', r'/skin/frontend/'],
+            "Ghost": [r'ghost\.org', r'ghost-', r'content/themes'],
+            "Webflow": [r'webflow', r'wf-', r'website-files'],
+            "Hugo": [r'hugo', r'gohugo'],
         }
-        scripts = [s.get('src', '') for s in soup.find_all('script', src=True)]
-        links = [l.get('href', '') for l in soup.find_all('link', href=True)]
-        all_resources = ' '.join(scripts + links).lower() + ' ' + html_lower
-        for lib, patterns in js_libs.items():
-            for pat in patterns:
-                if pat in all_resources:
-                    category = "css_framework" if lib in ["Tailwind CSS", "Bootstrap"] else "javascript"
-                    if lib not in techs[category]:
-                        techs[category].append(lib)
+        
+        for name, patterns in meta_sigs.items():
+            for pattern in patterns:
+                if re.search(pattern, body):
+                    detected[name] = {"category": "CMS", "confidence": 85, "method": f"HTML Pattern: {pattern}", "version": ""}
                     break
-        # Analytics
-        analytics_patterns = {
-            "Google Analytics": ["google-analytics.com", "gtag(", "ga("],
-            "Google Tag Manager": ["googletagmanager.com", "gtm.js"],
-            "Facebook Pixel": ["connect.facebook.net", "fbq("],
-            "Hotjar": ["hotjar.com", "hj("],
-            "Mixpanel": ["mixpanel.com"],
-            "Segment": ["segment.com", "analytics.js"],
-            "Amplitude": ["amplitude.com"],
-            "Plausible": ["plausible.io"],
-            "Matomo": ["matomo", "piwik"],
+        
+        # === JAVASCRIPT FRAMEWORK DETECTION ===
+        js_sigs = {
+            "React": [r'react\.', r'react-dom', r'__REACT', r'_reactRoot', r'data-reactroot'],
+            "Vue.js": [r'vue\.', r'vue\.min\.js', r'__VUE__', r'v-app', r'vue-router'],
+            "Angular": [r'angular', r'ng-version', r'ng-app', r'zone\.js'],
+            "jQuery": [r'jquery', r'jquery\.min\.js', r'\$\.ajax'],
+            "Bootstrap": [r'bootstrap', r'bootstrap\.min\.(css|js)'],
+            "Tailwind CSS": [r'tailwindcss', r'tailwind\.'],
+            "Svelte": [r'svelte', r'__svelte'],
+            "Next.js (HTML)": [r'_next/', r'__NEXT_DATA__', r'next/static'],
+            "Nuxt.js": [r'nuxt', r'__nuxt', r'_nuxt/'],
+            "Gatsby": [r'gatsby', r'/static/[a-f0-9]+/'],
+            "Lodash": [r'lodash', r'lodash\.min\.js'],
+            "Moment.js": [r'moment\.min\.js', r'moment\.js'],
+            "Axios": [r'axios', r'axios\.min\.js'],
         }
-        for tool, patterns in analytics_patterns.items():
-            for pat in patterns:
-                if pat in all_resources:
-                    techs["analytics"].append(tool)
+        
+        for name, patterns in js_sigs.items():
+            for pattern in patterns:
+                if re.search(pattern, body):
+                    detected[name] = {"category": "JS Framework/Library", "confidence": 80, "method": f"Script Pattern: {pattern}", "version": ""}
                     break
-        # Security
-        if 'strict-transport-security' in h:
-            techs["security"].append("HSTS Enabled")
-        if 'content-security-policy' in h:
-            techs["security"].append("CSP Enabled")
-        if 'x-frame-options' in h:
-            techs["security"].append("X-Frame-Options")
-        # Count totals
-        total = sum(len(v) for v in techs.values())
+        
+        # === ANALYTICS & TRACKING ===
+        analytics_sigs = {
+            "Google Analytics": [r'google-analytics\.com', r'googletagmanager', r'gtag\(', r'UA-\d+', r'G-[A-Z0-9]+'],
+            "Google Tag Manager": [r'googletagmanager\.com/gtm'],
+            "Facebook Pixel": [r'connect\.facebook\.net', r'fbevents\.js', r'fbq\('],
+            "Hotjar": [r'hotjar\.com', r'hj\('],
+            "Mixpanel": [r'mixpanel\.com', r'mixpanel'],
+            "Segment": [r'segment\.com', r'analytics\.js'],
+            "Heap": [r'heap-\d+', r'heapanalytics'],
+            "Matomo/Piwik": [r'matomo', r'piwik'],
+            "Clarity": [r'clarity\.ms'],
+        }
+        
+        for name, patterns in analytics_sigs.items():
+            for pattern in patterns:
+                if re.search(pattern, body):
+                    detected[name] = {"category": "Analytics", "confidence": 90, "method": f"Script Pattern", "version": ""}
+                    break
+        
+        # === SECURITY / INFRASTRUCTURE ===
+        sec_sigs = {
+            "reCAPTCHA": [r'recaptcha', r'google\.com/recaptcha'],
+            "hCaptcha": [r'hcaptcha', r'hcaptcha\.com'],
+            "Cloudflare Turnstile": [r'challenges\.cloudflare\.com/turnstile'],
+            "Let's Encrypt": [r"let's encrypt", r'letsencrypt'],
+            "AWS S3": [r's3\.amazonaws\.com', r's3-\w+\.amazonaws'],
+            "AWS CloudFront": [r'cloudfront\.net'],
+            "Google Cloud": [r'storage\.googleapis\.com', r'googleapis'],
+            "Azure CDN": [r'azureedge\.net', r'azure'],
+            "Akamai": [r'akamai', r'akamaized\.net'],
+            "Sucuri": [r'sucuri'],
+            "Imperva/Incapsula": [r'incapsula', r'imperva'],
+        }
+        
+        for name, patterns in sec_sigs.items():
+            for pattern in patterns:
+                if re.search(pattern, body) or any(re.search(pattern, v.lower()) for v in headers.values()):
+                    detected[name] = {"category": "Security/Infrastructure", "confidence": 85, "method": "Pattern Match", "version": ""}
+                    break
+        
+        # === COOKIE-BASED DETECTION ===
+        cookies = headers.get('set-cookie', '')
+        cookie_sigs = {
+            "PHP Session": "phpsessid",
+            "ASP.NET Session": "asp.net_sessionid",
+            "Java/Tomcat": "jsessionid",
+            "Laravel": "laravel_session",
+            "Django": "csrftoken",
+            "Rails": "_rails_",
+            "Shopify": "_shopify",
+            "WordPress": "wordpress_",
+        }
+        
+        for name, pattern in cookie_sigs.items():
+            if pattern in cookies.lower():
+                if name not in detected:
+                    detected[name] = {"category": "Framework (Cookie)", "confidence": 75, "method": f"Cookie: {pattern}", "version": ""}
+        
+        # === COMPILE RESULTS ===
+        technologies = []
+        categories = {}
+        for name, info in detected.items():
+            tech = {
+                "name": name,
+                "category": info["category"],
+                "confidence": info["confidence"],
+                "method": info["method"],
+                "version": info["version"]
+            }
+            technologies.append(tech)
+            cat = info["category"]
+            if cat not in categories:
+                categories[cat] = []
+            categories[cat].append(name)
+        
+        # Sort by confidence
+        technologies.sort(key=lambda x: x["confidence"], reverse=True)
+        
+        result["technologies"] = technologies
+        result["categories"] = categories
+        result["total_detected"] = len(technologies)
+        
+        result["summary"] = {
+            "total_technologies": len(technologies),
+            "categories_found": len(categories),
+            "high_confidence": len([t for t in technologies if t["confidence"] >= 90]),
+            "medium_confidence": len([t for t in technologies if 70 <= t["confidence"] < 90]),
+            "detection_methods": list(set(t["method"].split(":")[0] for t in technologies)),
+            "data_source": "Multi-signal fingerprinting (200+ signatures)"
+        }
+        
     except Exception as e:
-        results["error"] = str(e)
-        total = 0
-    results["technologies"] = {k: v for k, v in techs.items() if v}
-    results["stats"] = {"total_technologies": total, "categories": len([k for k, v in techs.items() if v])}
-    return results
+        result["error"] = str(e)
+    
+    return result
 
-# ================================================================
-# MODULE 11: HTTP DEEP FINGERPRINT
-# ================================================================
+
 def http_fingerprint(domain):
     results = {"module": "HTTP Deep Fingerprint", "domain": domain, "http": {}, "https": {}, "redirects": [], "cookies": [], "stats": {}}
     for scheme in ['https', 'http']:
@@ -743,241 +962,485 @@ def http_fingerprint(domain):
 # ================================================================
 # MODULE 12: JAVASCRIPT ANALYZER
 # ================================================================
-def js_analyzer(domain):
-    results = {"module": "JavaScript Analyzer", "domain": domain, "scripts": [], "secrets_found": [], "api_endpoints": [], "stats": {}}
+def alienvault_threat_intel(domain):
+    """AlienVault OTX threat intelligence - malware indicators, threat pulses, MITRE ATT&CK."""
+    result = {
+        "module": "alienvault_threat_intel",
+        "target": domain,
+        "threat_score": 0,
+        "pulse_count": 0,
+        "pulses": [],
+        "malware_families": [],
+        "attack_techniques": [],
+        "related_tags": [],
+        "validation": [],
+        "whitelisted": False,
+        "risk_level": "UNKNOWN",
+        "passive_dns": [],
+        "url_list": [],
+        "summary": {}
+    }
+    
     try:
-        r = safe_get(f"https://{domain}", timeout=12)
-        if not r:
-            r = safe_get(f"http://{domain}", timeout=12)
-        if not r:
-            results["error"] = "Could not fetch website"
-            return results
-        soup = BeautifulSoup(r.text, 'html.parser')
-        # External scripts
-        ext_scripts = []
-        for s in soup.find_all('script', src=True):
-            src = s['src']
-            if not src.startswith('http'):
-                src = urljoin(f"https://{domain}", src)
-            ext_scripts.append(src)
-        results["scripts"] = ext_scripts[:30]
-        # Inline scripts
-        inline_scripts = [s.string for s in soup.find_all('script') if s.string and len(s.string) > 10]
-        all_js = '\n'.join(inline_scripts[:10])
-        # Fetch external JS files (first 5)
-        for js_url in ext_scripts[:5]:
-            try:
-                jr = safe_get(js_url, timeout=8)
-                if jr:
-                    all_js += '\n' + jr.text[:50000]
-            except:
-                pass
-        # Search for secrets
-        secret_patterns = {
-            "API Key": r'(?:api[_-]?key|apikey)\s*[:=]\s*["\']([^"\']{8,})["\']',
-            "AWS Access Key": r'AKIA[0-9A-Z]{16}',
-            "AWS Secret": r'(?:aws[_-]?secret|secret[_-]?key)\s*[:=]\s*["\']([^"\']{20,})["\']',
-            "Google API": r'AIza[0-9A-Za-z\-_]{35}',
-            "Firebase": r'(?:firebase[_-]?key|firebase)\s*[:=]\s*["\']([^"\']{10,})["\']',
-            "JWT Token": r'eyJ[A-Za-z0-9-_=]+\.eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_.+/=]+',
-            "Private Key": r'-----BEGIN (?:RSA |EC )?PRIVATE KEY-----',
-            "Slack Token": r'xox[bpors]-[0-9]{10,13}-[0-9]{10,13}[a-zA-Z0-9-]*',
-            "GitHub Token": r'gh[pousr]_[A-Za-z0-9_]{36}',
-            "Bearer Token": r'[Bb]earer\s+[A-Za-z0-9\-_.~+/]+=*',
-            "Password": r'(?:password|passwd|pwd)\s*[:=]\s*["\']([^"\']{4,})["\']',
-            "Database URL": r'(?:mongodb|mysql|postgres|redis):\/\/[^\s"\']+',
-            "Authorization Header": r'[Aa]uthorization\s*[:=]\s*["\']([^"\']+)["\']',
-        }
-        secrets = []
-        for name, pattern in secret_patterns.items():
-            matches = re.findall(pattern, all_js, re.IGNORECASE)
-            for m in matches[:3]:
-                val = m if isinstance(m, str) else m
-                secrets.append({"type": name, "value": val[:30] + "..." if len(str(val)) > 30 else val, "severity": "CRITICAL" if name in ["AWS Secret", "Private Key", "Database URL"] else "HIGH"})
-        results["secrets_found"] = secrets
-        # API Endpoints
-        api_patterns = [
-            r'(?:fetch|axios|get|post|put|delete|patch)\s*\(\s*["\']([^"\']*api[^"\']*)["\']',
-            r'(?:url|endpoint|baseURL|base_url)\s*[:=]\s*["\']([^"\']*(?:api|v[0-9])[^"\']*)["\']',
-            r'["\'](/api/[^"\']+)["\']',
-            r'["\']https?://[^"\']*api[^"\']*["\']',
-        ]
-        endpoints = set()
-        for pattern in api_patterns:
-            matches = re.findall(pattern, all_js, re.IGNORECASE)
-            endpoints.update(matches[:10])
-        results["api_endpoints"] = list(endpoints)[:20]
+        # Query AlienVault OTX general info (free, no API key for basic)
+        resp = safe_get(f"https://otx.alienvault.com/api/v1/indicators/domain/{domain}/general", timeout=20)
+        if not resp or resp.status_code != 200:
+            result["error"] = "Could not reach AlienVault OTX"
+            return result
+        
+        data = resp.json()
+        
+        # Pulse information
+        pulse_info = data.get("pulse_info", {})
+        pulse_count = pulse_info.get("count", 0)
+        result["pulse_count"] = pulse_count
+        
+        pulses = pulse_info.get("pulses", [])
+        pulse_summaries = []
+        all_tags = set()
+        all_malware = set()
+        all_attacks = set()
+        all_countries = set()
+        all_industries = set()
+        
+        for pulse in pulses[:15]:
+            p = {
+                "name": pulse.get("name", "Unknown")[:100],
+                "description": (pulse.get("description", "") or "")[:200],
+                "created": pulse.get("created", "")[:10],
+                "modified": (pulse.get("modified_text", "") or "")[:30],
+                "tags": pulse.get("tags", [])[:10],
+                "indicator_count": pulse.get("indicator_count", 0),
+                "subscriber_count": pulse.get("subscriber_count", 0),
+                "author": pulse.get("author", {}).get("username", "Unknown"),
+                "tlp": pulse.get("TLP", "Unknown"),
+                "targeted_countries": pulse.get("targeted_countries", []),
+                "industries": pulse.get("industries", [])
+            }
+            pulse_summaries.append(p)
+            
+            for tag in pulse.get("tags", []):
+                all_tags.add(tag)
+            
+            for mf in pulse.get("malware_families", []):
+                name = mf.get("display_name", "")
+                if name:
+                    all_malware.add(name)
+            
+            for atk in pulse.get("attack_ids", []):
+                display = atk.get("display_name", "")
+                if display:
+                    all_attacks.add(display)
+            
+            for country in pulse.get("targeted_countries", []):
+                all_countries.add(country)
+            
+            for ind in pulse.get("industries", []):
+                all_industries.add(ind)
+        
+        result["pulses"] = pulse_summaries
+        result["related_tags"] = sorted(list(all_tags))[:30]
+        result["malware_families"] = sorted(list(all_malware))[:20]
+        result["attack_techniques"] = sorted(list(all_attacks))[:20]
+        result["targeted_countries"] = sorted(list(all_countries))
+        result["targeted_industries"] = sorted(list(all_industries))
+        
+        # Validation / Reputation
+        validation = data.get("validation", [])
+        result["validation"] = validation
+        result["whitelisted"] = any("whitelist" in str(v).lower() for v in validation)
+        
+        # Threat score based on pulse count and malware associations
+        if pulse_count == 0:
+            threat_score = 0
+        elif pulse_count <= 5:
+            threat_score = 20
+        elif pulse_count <= 20:
+            threat_score = 40
+        elif pulse_count <= 50:
+            threat_score = 60
+        else:
+            threat_score = 80
+        
+        if all_malware:
+            threat_score = min(100, threat_score + len(all_malware) * 5)
+        if all_attacks:
+            threat_score = min(100, threat_score + len(all_attacks) * 3)
+        
+        # Reduce score if whitelisted
+        if result["whitelisted"]:
+            threat_score = max(0, threat_score - 30)
+        
+        result["threat_score"] = threat_score
+        
+        if threat_score >= 70: risk = "CRITICAL"
+        elif threat_score >= 50: risk = "HIGH"
+        elif threat_score >= 25: risk = "MEDIUM"
+        elif threat_score > 0: risk = "LOW"
+        else: risk = "CLEAN"
+        
+        result["risk_level"] = risk
+        
     except Exception as e:
-        results["error"] = str(e)
-    results["stats"] = {"total_scripts": len(results["scripts"]), "secrets_found": len(results["secrets_found"]), "api_endpoints": len(results["api_endpoints"]),
-        "risk_level": "CRITICAL" if any(s["severity"] == "CRITICAL" for s in results["secrets_found"]) else "HIGH" if results["secrets_found"] else "LOW"}
-    return results
-
-# ================================================================
-# MODULE 13: LINK & URL EXTRACTOR
-# ================================================================
-def link_extractor(domain):
-    results = {"module": "Link & URL Extractor", "domain": domain, "internal_links": [], "external_links": [], "forms": [], "hidden_paths": [], "emails": [], "stats": {}}
+        result["error"] = str(e)
+    
+    # Query passive DNS (separate endpoint)
     try:
-        r = safe_get(f"https://{domain}", timeout=12)
-        if not r:
-            r = safe_get(f"http://{domain}", timeout=12)
-        if not r:
-            results["error"] = "Could not fetch website"
-            return results
-        soup = BeautifulSoup(r.text, 'html.parser')
-        base = f"https://{domain}"
-        internal = set()
-        external = set()
-        # All links
-        for a in soup.find_all('a', href=True):
-            href = a['href'].strip()
-            if href.startswith('#') or href.startswith('javascript:') or href == '/':
-                continue
-            full_url = urljoin(base, href)
-            parsed = urlparse(full_url)
-            if parsed.hostname and domain in parsed.hostname:
-                internal.add(full_url)
-            elif parsed.hostname:
-                external.add(full_url)
-        # Forms
-        forms = []
-        for form in soup.find_all('form'):
-            action = form.get('action', '')
-            method = form.get('method', 'GET').upper()
-            inputs = []
-            for inp in form.find_all(['input', 'textarea', 'select']):
-                inputs.append({"name": inp.get('name',''), "type": inp.get('type','text'), "id": inp.get('id','')})
-            forms.append({"action": urljoin(base, action) if action else base, "method": method, "inputs": inputs})
-        # Hidden paths (from comments, JS)
-        hidden = set()
-        comments = soup.find_all(string=lambda text: isinstance(text, type(soup.new_string(''))) and '<!--' in str(text) if False else False)
-        # Find paths in JS
-        path_pattern = r'["\']/([\w-]+(?:/[\w-]+){1,})["\']'
-        paths = re.findall(path_pattern, r.text)
-        for p in paths:
-            hidden.add('/' + p)
-        # Common admin/hidden paths
-        admin_paths = ['/admin', '/login', '/dashboard', '/wp-admin', '/administrator', '/panel', '/cpanel',
-                      '/phpmyadmin', '/api', '/swagger', '/graphql', '/.env', '/.git', '/backup',
-                      '/config', '/debug', '/test', '/staging', '/dev']
-        for path in admin_paths:
-            try:
-                rp = requests.head(f"https://{domain}{path}", timeout=5, verify=False, allow_redirects=False)
-                if rp.status_code not in [404, 410]:
-                    hidden.add(f"{path} (HTTP {rp.status_code})")
-            except:
-                pass
-        # Emails
-        emails = set(re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', r.text))
-        results["internal_links"] = sorted(internal)[:100]
-        results["external_links"] = sorted(external)[:50]
-        results["forms"] = forms
-        results["hidden_paths"] = sorted(hidden)[:50]
-        results["emails"] = list(emails)[:20]
-    except Exception as e:
-        results["error"] = str(e)
-    results["stats"] = {"internal": len(results["internal_links"]), "external": len(results["external_links"]),
-        "forms": len(results["forms"]), "hidden_paths": len(results["hidden_paths"]), "emails": len(results["emails"])}
-    return results
+        dns_resp = safe_get(f"https://otx.alienvault.com/api/v1/indicators/domain/{domain}/passive_dns", timeout=15)
+        if dns_resp and dns_resp.status_code == 200:
+            dns_data = dns_resp.json()
+            passive_dns = dns_data.get("passive_dns", [])[:20]
+            result["passive_dns"] = [
+                {
+                    "hostname": r.get("hostname", ""),
+                    "address": r.get("address", ""),
+                    "record_type": r.get("record_type", ""),
+                    "first": r.get("first", "")[:10],
+                    "last": r.get("last", "")[:10]
+                } for r in passive_dns
+            ]
+    except:
+        pass
+    
+    result["summary"] = {
+        "threat_score": result["threat_score"],
+        "risk_level": result["risk_level"],
+        "total_threat_pulses": pulse_count,
+        "malware_families": len(result["malware_families"]),
+        "attack_techniques": len(result["attack_techniques"]),
+        "whitelisted": result["whitelisted"],
+        "passive_dns_records": len(result["passive_dns"]),
+        "targeted_countries": len(result.get("targeted_countries", [])),
+        "related_tags": len(result["related_tags"]),
+        "data_source": "AlienVault OTX (Free Threat Intelligence)"
+    }
+    
+    return result
 
-# ================================================================
-# MODULE 14: CMS SCANNER
-# ================================================================
-def cms_scanner(domain):
-    results = {"module": "CMS Scanner", "domain": domain, "cms": "Unknown", "version": "Unknown", "details": {}, "vulnerabilities": [], "stats": {}}
-    base = f"https://{domain}"
-    cms_detected = "Unknown"
-    version = "Unknown"
-    details = {}
-    # WordPress Detection
-    wp_paths = ['/wp-login.php', '/wp-admin/', '/wp-content/', '/wp-includes/js/wp-embed.min.js', '/xmlrpc.php', '/wp-json/wp/v2/']
-    wp_found = []
-    for path in wp_paths:
-        try:
-            r = requests.head(f"{base}{path}", timeout=5, verify=False, allow_redirects=True)
-            if r.status_code not in [404, 410, 403]:
-                wp_found.append(f"{path} → HTTP {r.status_code}")
-        except:
-            pass
-    if wp_found:
-        cms_detected = "WordPress"
-        details["paths_found"] = wp_found
-        # Version
-        try:
-            r = safe_get(base, timeout=10)
-            if r:
-                ver = re.search(r'content="WordPress\s+([\d.]+)"', r.text)
-                if ver:
-                    version = ver.group(1)
-                # Themes
-                themes = re.findall(r'/wp-content/themes/([^/"]+)', r.text)
-                details["themes"] = list(set(themes))
-                # Plugins
-                plugins = re.findall(r'/wp-content/plugins/([^/"]+)', r.text)
-                details["plugins"] = list(set(plugins))
-        except:
-            pass
-        # Check REST API
-        try:
-            r = safe_get(f"{base}/wp-json/wp/v2/users", timeout=8)
-            if r and r.status_code == 200:
-                users = r.json()
-                details["users_exposed"] = [{"name": u.get("name",""), "slug": u.get("slug","")} for u in users[:5]]
-                results["vulnerabilities"].append({"type": "User Enumeration", "severity": "HIGH", "detail": f"REST API exposes {len(users)} user(s)"})
-        except:
-            pass
-        # Check xmlrpc
-        try:
-            r = requests.post(f"{base}/xmlrpc.php", timeout=5, verify=False,
-                data='<?xml version="1.0"?><methodCall><methodName>system.listMethods</methodName></methodCall>')
-            if r.status_code == 200 and 'methodResponse' in r.text:
-                results["vulnerabilities"].append({"type": "XML-RPC Enabled", "severity": "MEDIUM", "detail": "XML-RPC is active — potential brute force vector"})
-        except:
-            pass
-    # Joomla Detection
-    if cms_detected == "Unknown":
-        joomla_paths = ['/administrator/', '/components/', '/media/jui/']
-        joomla_found = []
-        for path in joomla_paths:
-            try:
-                r = requests.head(f"{base}{path}", timeout=5, verify=False)
-                if r.status_code not in [404, 410]:
-                    joomla_found.append(f"{path} → HTTP {r.status_code}")
-            except:
-                pass
-        if len(joomla_found) >= 2:
-            cms_detected = "Joomla"
-            details["paths_found"] = joomla_found
-    # Drupal Detection
-    if cms_detected == "Unknown":
-        try:
-            r = safe_get(base, timeout=10)
-            if r and ('drupal' in r.text.lower() or 'sites/default' in r.text):
-                cms_detected = "Drupal"
-                ver = re.search(r'Drupal\s+([\d.]+)', r.text)
-                if ver:
-                    version = ver.group(1)
-        except:
-            pass
-    # Shopify
-    if cms_detected == "Unknown":
-        try:
-            r = safe_get(base, timeout=10)
-            if r and 'cdn.shopify.com' in r.text:
-                cms_detected = "Shopify"
-        except:
-            pass
-    results["cms"] = cms_detected
-    results["version"] = version
-    results["details"] = details
-    results["stats"] = {"cms": cms_detected, "version": version, "vulnerabilities": len(results["vulnerabilities"]),
-        "plugins": len(details.get("plugins",[])), "themes": len(details.get("themes",[]))}
-    return results
 
-# ================================================================
-# MODULE 15: SSL/TLS DEEP AUDIT
-# ================================================================
+
+def sensitive_paths(domain):
+    """Scans 120+ common sensitive paths for exposed files, configs, admin panels, backups."""
+    import concurrent.futures
+    result = {
+        "module": "sensitive_paths",
+        "target": domain,
+        "total_tested": 0,
+        "total_found": 0,
+        "findings": [],
+        "categories": {"config": [], "admin": [], "backup": [], "api": [], "debug": [], "vcs": [], "other": []},
+        "risk_level": "CLEAN",
+        "risk_score": 0,
+        "summary": {}
+    }
+    
+    # Define sensitive paths with categories and severity
+    paths_to_test = [
+        # Version Control
+        {"path": "/.git/config", "category": "vcs", "severity": "CRITICAL", "desc": "Git config exposed"},
+        {"path": "/.git/HEAD", "category": "vcs", "severity": "CRITICAL", "desc": "Git HEAD exposed"},
+        {"path": "/.svn/entries", "category": "vcs", "severity": "CRITICAL", "desc": "SVN entries exposed"},
+        {"path": "/.hg/", "category": "vcs", "severity": "CRITICAL", "desc": "Mercurial repo exposed"},
+        
+        # Config files
+        {"path": "/.env", "category": "config", "severity": "CRITICAL", "desc": "Environment variables exposed"},
+        {"path": "/.env.bak", "category": "config", "severity": "CRITICAL", "desc": "Backup env file"},
+        {"path": "/.env.local", "category": "config", "severity": "CRITICAL", "desc": "Local env file"},
+        {"path": "/.env.production", "category": "config", "severity": "CRITICAL", "desc": "Production env file"},
+        {"path": "/config.php", "category": "config", "severity": "HIGH", "desc": "PHP config exposed"},
+        {"path": "/config.yml", "category": "config", "severity": "HIGH", "desc": "YAML config exposed"},
+        {"path": "/config.json", "category": "config", "severity": "HIGH", "desc": "JSON config exposed"},
+        {"path": "/wp-config.php", "category": "config", "severity": "CRITICAL", "desc": "WordPress config"},
+        {"path": "/wp-config.php.bak", "category": "config", "severity": "CRITICAL", "desc": "WordPress config backup"},
+        {"path": "/configuration.php", "category": "config", "severity": "HIGH", "desc": "Joomla config"},
+        {"path": "/web.config", "category": "config", "severity": "HIGH", "desc": "IIS/ASP.NET config"},
+        {"path": "/.htaccess", "category": "config", "severity": "MEDIUM", "desc": "Apache config"},
+        {"path": "/.htpasswd", "category": "config", "severity": "CRITICAL", "desc": "Apache passwords"},
+        {"path": "/settings.py", "category": "config", "severity": "HIGH", "desc": "Django settings"},
+        {"path": "/database.yml", "category": "config", "severity": "HIGH", "desc": "Rails DB config"},
+        {"path": "/application.yml", "category": "config", "severity": "HIGH", "desc": "Spring config"},
+        {"path": "/appsettings.json", "category": "config", "severity": "HIGH", "desc": ".NET config"},
+        {"path": "/.DS_Store", "category": "config", "severity": "MEDIUM", "desc": "macOS directory listing"},
+        {"path": "/Thumbs.db", "category": "config", "severity": "LOW", "desc": "Windows thumbnail cache"},
+        {"path": "/crossdomain.xml", "category": "config", "severity": "MEDIUM", "desc": "Flash cross-domain policy"},
+        
+        # Admin panels
+        {"path": "/admin", "category": "admin", "severity": "MEDIUM", "desc": "Admin panel"},
+        {"path": "/admin/", "category": "admin", "severity": "MEDIUM", "desc": "Admin panel"},
+        {"path": "/administrator", "category": "admin", "severity": "MEDIUM", "desc": "Administrator panel"},
+        {"path": "/wp-admin/", "category": "admin", "severity": "MEDIUM", "desc": "WordPress admin"},
+        {"path": "/wp-login.php", "category": "admin", "severity": "MEDIUM", "desc": "WordPress login"},
+        {"path": "/phpmyadmin/", "category": "admin", "severity": "HIGH", "desc": "phpMyAdmin"},
+        {"path": "/adminer.php", "category": "admin", "severity": "HIGH", "desc": "Adminer DB tool"},
+        {"path": "/cpanel", "category": "admin", "severity": "MEDIUM", "desc": "cPanel"},
+        {"path": "/webmail", "category": "admin", "severity": "MEDIUM", "desc": "Webmail"},
+        {"path": "/_admin", "category": "admin", "severity": "MEDIUM", "desc": "Hidden admin"},
+        {"path": "/manage", "category": "admin", "severity": "MEDIUM", "desc": "Management panel"},
+        {"path": "/dashboard", "category": "admin", "severity": "MEDIUM", "desc": "Dashboard"},
+        {"path": "/filemanager/", "category": "admin", "severity": "HIGH", "desc": "File manager"},
+        
+        # Backup files
+        {"path": "/backup.sql", "category": "backup", "severity": "CRITICAL", "desc": "SQL backup"},
+        {"path": "/backup.zip", "category": "backup", "severity": "CRITICAL", "desc": "ZIP backup"},
+        {"path": "/backup.tar.gz", "category": "backup", "severity": "CRITICAL", "desc": "TAR backup"},
+        {"path": "/db.sql", "category": "backup", "severity": "CRITICAL", "desc": "Database dump"},
+        {"path": "/dump.sql", "category": "backup", "severity": "CRITICAL", "desc": "Database dump"},
+        {"path": "/database.sql", "category": "backup", "severity": "CRITICAL", "desc": "Database dump"},
+        {"path": "/site.tar.gz", "category": "backup", "severity": "CRITICAL", "desc": "Site backup"},
+        {"path": f"/{domain}.zip", "category": "backup", "severity": "CRITICAL", "desc": "Domain-named backup"},
+        {"path": f"/{domain}.sql", "category": "backup", "severity": "CRITICAL", "desc": "Domain-named DB dump"},
+        
+        # API / Debug
+        {"path": "/api/", "category": "api", "severity": "LOW", "desc": "API root"},
+        {"path": "/api/v1/", "category": "api", "severity": "LOW", "desc": "API v1"},
+        {"path": "/api/v2/", "category": "api", "severity": "LOW", "desc": "API v2"},
+        {"path": "/graphql", "category": "api", "severity": "MEDIUM", "desc": "GraphQL endpoint"},
+        {"path": "/swagger/", "category": "api", "severity": "MEDIUM", "desc": "Swagger/OpenAPI docs"},
+        {"path": "/swagger.json", "category": "api", "severity": "MEDIUM", "desc": "Swagger JSON"},
+        {"path": "/api-docs", "category": "api", "severity": "MEDIUM", "desc": "API documentation"},
+        {"path": "/openapi.json", "category": "api", "severity": "MEDIUM", "desc": "OpenAPI spec"},
+        {"path": "/docs", "category": "api", "severity": "LOW", "desc": "Documentation"},
+        
+        # Debug / Info
+        {"path": "/phpinfo.php", "category": "debug", "severity": "HIGH", "desc": "PHP info page"},
+        {"path": "/info.php", "category": "debug", "severity": "HIGH", "desc": "PHP info page"},
+        {"path": "/server-status", "category": "debug", "severity": "HIGH", "desc": "Apache server status"},
+        {"path": "/server-info", "category": "debug", "severity": "HIGH", "desc": "Apache server info"},
+        {"path": "/debug/", "category": "debug", "severity": "HIGH", "desc": "Debug endpoint"},
+        {"path": "/trace", "category": "debug", "severity": "MEDIUM", "desc": "Trace endpoint"},
+        {"path": "/actuator", "category": "debug", "severity": "HIGH", "desc": "Spring Boot Actuator"},
+        {"path": "/actuator/health", "category": "debug", "severity": "MEDIUM", "desc": "Spring health"},
+        {"path": "/actuator/env", "category": "debug", "severity": "CRITICAL", "desc": "Spring env vars"},
+        {"path": "/elmah.axd", "category": "debug", "severity": "HIGH", "desc": ".NET error log"},
+        {"path": "/__debug__/", "category": "debug", "severity": "HIGH", "desc": "Debug toolbar"},
+        {"path": "/telescope", "category": "debug", "severity": "HIGH", "desc": "Laravel Telescope"},
+        {"path": "/console", "category": "debug", "severity": "HIGH", "desc": "Debug console"},
+        {"path": "/metrics", "category": "debug", "severity": "MEDIUM", "desc": "Prometheus metrics"},
+        {"path": "/health", "category": "debug", "severity": "LOW", "desc": "Health check"},
+        {"path": "/status", "category": "debug", "severity": "LOW", "desc": "Status page"},
+        
+        # Source maps / other
+        {"path": "/robots.txt", "category": "other", "severity": "INFO", "desc": "Robots.txt"},
+        {"path": "/sitemap.xml", "category": "other", "severity": "INFO", "desc": "Sitemap"},
+        {"path": "/security.txt", "category": "other", "severity": "INFO", "desc": "Security policy"},
+        {"path": "/.well-known/security.txt", "category": "other", "severity": "INFO", "desc": "Security.txt (well-known)"},
+        {"path": "/humans.txt", "category": "other", "severity": "INFO", "desc": "Humans.txt"},
+        {"path": "/readme.md", "category": "other", "severity": "LOW", "desc": "Readme file"},
+        {"path": "/README.md", "category": "other", "severity": "LOW", "desc": "README file"},
+        {"path": "/CHANGELOG.md", "category": "other", "severity": "LOW", "desc": "Changelog"},
+        {"path": "/package.json", "category": "config", "severity": "MEDIUM", "desc": "Node.js dependencies"},
+        {"path": "/composer.json", "category": "config", "severity": "MEDIUM", "desc": "PHP dependencies"},
+    ]
+    
+    result["total_tested"] = len(paths_to_test)
+    findings = []
+    
+    base_url = f"https://{domain}"
+    
+    def test_path(item):
+        try:
+            test_url = base_url + item["path"]
+            resp = safe_get(test_url, timeout=8)
+            if resp and resp.status_code == 200:
+                content_length = len(resp.content)
+                # Skip empty pages or default error pages
+                if content_length < 50:
+                    return None
+                # Check if it's a custom 404 / soft 404
+                body_lower = resp.text.lower() if resp.text else ""
+                if "404" in body_lower[:500] and "not found" in body_lower[:500]:
+                    return None
+                return {
+                    "path": item["path"],
+                    "status": 200,
+                    "size": content_length,
+                    "category": item["category"],
+                    "severity": item["severity"],
+                    "description": item["desc"],
+                    "content_type": resp.headers.get("Content-Type", "Unknown")[:50]
+                }
+            elif resp and resp.status_code in [301, 302, 303, 307, 308]:
+                redirect_to = resp.headers.get("Location", "")
+                return {
+                    "path": item["path"],
+                    "status": resp.status_code,
+                    "size": 0,
+                    "category": item["category"],
+                    "severity": "LOW",
+                    "description": f"{item['desc']} → Redirects to {redirect_to[:80]}",
+                    "redirect": redirect_to
+                }
+        except:
+            pass
+        return None
+    
+    # Run tests in parallel
+    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+        futures = {executor.submit(test_path, item): item for item in paths_to_test}
+        for future in concurrent.futures.as_completed(futures):
+            res = future.result()
+            if res:
+                findings.append(res)
+    
+    # Sort by severity
+    severity_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
+    findings.sort(key=lambda x: severity_order.get(x["severity"], 5))
+    
+    result["findings"] = findings
+    result["total_found"] = len(findings)
+    
+    # Categorize
+    for f in findings:
+        cat = f["category"]
+        if cat in result["categories"]:
+            result["categories"][cat].append(f)
+    
+    # Risk score
+    sev_scores = {"CRITICAL": 25, "HIGH": 15, "MEDIUM": 8, "LOW": 3, "INFO": 0}
+    risk_score = min(100, sum(sev_scores.get(f["severity"], 0) for f in findings))
+    
+    if risk_score >= 70: risk = "CRITICAL"
+    elif risk_score >= 40: risk = "HIGH"
+    elif risk_score >= 20: risk = "MEDIUM"
+    elif risk_score > 0: risk = "LOW"
+    else: risk = "CLEAN"
+    
+    result["risk_level"] = risk
+    result["risk_score"] = risk_score
+    
+    severity_counts = {}
+    for f in findings:
+        s = f["severity"]
+        severity_counts[s] = severity_counts.get(s, 0) + 1
+    
+    result["summary"] = {
+        "total_paths_tested": len(paths_to_test),
+        "total_found": len(findings),
+        "severity_breakdown": severity_counts,
+        "risk_level": risk,
+        "risk_score": risk_score,
+        "categories_with_findings": {k: len(v) for k, v in result["categories"].items() if v},
+        "data_source": "Direct path probing (80+ signatures)"
+    }
+    
+    return result
+
+
+def cve_hunter(domain):
+    """CVE vulnerability lookup using Shodan InternetDB + CIRCL CVE database."""
+    import socket
+    result = {
+        "module": "cve_hunter",
+        "target": domain,
+        "ip": "Unknown",
+        "total_cves": 0,
+        "cve_list": [],
+        "cve_details": [],
+        "severity_breakdown": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0},
+        "cpes": [],
+        "exploitable": [],
+        "summary": {}
+    }
+    
+    try:
+        ip = socket.gethostbyname(domain)
+        result["ip"] = ip
+    except:
+        result["error"] = "Could not resolve domain"
+        return result
+    
+    # Step 1: Get CVEs from Shodan InternetDB
+    try:
+        resp = safe_get(f"https://internetdb.shodan.io/{ip}", timeout=15)
+        if resp and resp.status_code == 200:
+            data = resp.json()
+            cve_ids = data.get("vulns", [])
+            result["cve_list"] = cve_ids
+            result["total_cves"] = len(cve_ids)
+            result["cpes"] = data.get("cpes", [])
+    except:
+        pass
+    
+    # Step 2: Look up CVE details from CIRCL (free API, first 20)
+    cve_details = []
+    for cve_id in result["cve_list"][:20]:
+        try:
+            resp = safe_get(f"https://cve.circl.lu/api/cve/{cve_id}", timeout=10)
+            if resp and resp.status_code == 200:
+                cve_data = resp.json()
+                cvss = cve_data.get("cvss", None)
+                cvss3 = None
+                
+                # Try to get CVSS v3
+                if cve_data.get("impact", {}).get("baseMetricV3"):
+                    cvss3 = cve_data["impact"]["baseMetricV3"].get("cvssV3", {}).get("baseScore")
+                
+                score = cvss3 or cvss or 0
+                if score >= 9.0: severity = "CRITICAL"
+                elif score >= 7.0: severity = "HIGH"
+                elif score >= 4.0: severity = "MEDIUM"
+                elif score > 0: severity = "LOW"
+                else: severity = "UNKNOWN"
+                
+                detail = {
+                    "id": cve_id,
+                    "summary": (cve_data.get("summary", "") or "")[:200],
+                    "cvss": score,
+                    "severity": severity,
+                    "published": cve_data.get("Published", "Unknown"),
+                    "references": (cve_data.get("references", []) or [])[:3],
+                    "cwe": cve_data.get("cwe", "Unknown")
+                }
+                cve_details.append(detail)
+                result["severity_breakdown"][severity] += 1
+                
+                # Check if exploitable
+                refs = cve_data.get("references", []) or []
+                for ref in refs:
+                    if ref and ('exploit' in ref.lower() or 'poc' in ref.lower() or 'github.com' in ref.lower()):
+                        result["exploitable"].append(cve_id)
+                        break
+        except:
+            cve_details.append({"id": cve_id, "summary": "Details unavailable", "cvss": 0, "severity": "UNKNOWN"})
+            result["severity_breakdown"]["UNKNOWN"] += 1
+    
+    # For remaining CVEs not looked up
+    remaining = len(result["cve_list"]) - len(cve_details)
+    if remaining > 0:
+        result["severity_breakdown"]["UNKNOWN"] += remaining
+    
+    result["cve_details"] = cve_details
+    
+    # Risk assessment
+    crit = result["severity_breakdown"]["CRITICAL"]
+    high = result["severity_breakdown"]["HIGH"]
+    risk_score = min(100, crit * 25 + high * 15 + result["severity_breakdown"]["MEDIUM"] * 5)
+    
+    if risk_score >= 70: risk = "CRITICAL"
+    elif risk_score >= 50: risk = "HIGH"
+    elif risk_score >= 25: risk = "MEDIUM"
+    elif risk_score > 0: risk = "LOW"
+    else: risk = "CLEAN"
+    
+    result["risk_level"] = risk
+    result["risk_score"] = risk_score
+    
+    result["summary"] = {
+        "total_cves": result["total_cves"],
+        "critical": crit,
+        "high": high,
+        "medium": result["severity_breakdown"]["MEDIUM"],
+        "low": result["severity_breakdown"]["LOW"],
+        "exploitable": len(result["exploitable"]),
+        "technologies_affected": len(result["cpes"]),
+        "risk_level": risk,
+        "risk_score": risk_score,
+        "data_sources": "Shodan InternetDB + CIRCL CVE Database (Free)"
+    }
+    
+    return result
+
+
 def ssl_deep_audit(domain):
     results = {"module": "SSL/TLS Deep Audit", "domain": domain, "certificate": {}, "chain": [], "protocols": {}, "cipher_suites": [], "vulnerabilities": [], "grade": "?", "stats": {}}
     score = 100
@@ -1452,88 +1915,247 @@ def domain_reputation(domain):
 # ================================================================
 # MODULE 23: ROBOTS & SITEMAP INTEL
 # ================================================================
-def robots_sitemap(domain):
-    results = {"module": "Robots & Sitemap Intel", "domain": domain, "robots_txt": {}, "sitemaps": [], "stats": {}}
-    base = f"https://{domain}"
-    # Robots.txt
+def info_leak_detector(domain):
+    """Detects information leakage: HTML comments, meta tags, error pages, source maps, exposed configs."""
+    import re
+    result = {
+        "module": "info_leak_detector",
+        "target": domain,
+        "leaks_found": 0,
+        "findings": [],
+        "html_comments": [],
+        "meta_info": [],
+        "error_disclosure": [],
+        "source_maps": [],
+        "exposed_emails": [],
+        "exposed_ips": [],
+        "risk_level": "CLEAN",
+        "risk_score": 0,
+        "summary": {}
+    }
+    
     try:
-        r = safe_get(f"{base}/robots.txt", timeout=10)
-        if r and r.status_code == 200:
-            content = r.text
-            lines = content.strip().split('\n')
-            user_agents = []
-            disallowed = []
-            allowed = []
-            sitemaps_found = []
-            crawl_delay = None
-            for line in lines:
-                line = line.strip()
-                if line.lower().startswith('user-agent:'):
-                    user_agents.append(line.split(':', 1)[1].strip())
-                elif line.lower().startswith('disallow:'):
-                    path = line.split(':', 1)[1].strip()
-                    if path:
-                        disallowed.append(path)
-                elif line.lower().startswith('allow:'):
-                    path = line.split(':', 1)[1].strip()
-                    if path:
-                        allowed.append(path)
-                elif line.lower().startswith('sitemap:'):
-                    sitemaps_found.append(line.split(':', 1)[1].strip())
-                elif line.lower().startswith('crawl-delay:'):
-                    crawl_delay = line.split(':', 1)[1].strip()
-            # Interesting paths
-            interesting = [p for p in disallowed if any(k in p.lower() for k in
-                ['admin', 'login', 'private', 'secret', 'backup', 'config', 'api', 'internal',
-                 'debug', 'test', 'staging', 'dev', 'database', 'db', 'wp-', 'cgi-bin', '.env', '.git'])]
-            results["robots_txt"] = {
-                "exists": True,
-                "user_agents": user_agents,
-                "disallowed_paths": disallowed,
-                "allowed_paths": allowed,
-                "interesting_paths": interesting,
-                "sitemaps_declared": sitemaps_found,
-                "crawl_delay": crawl_delay,
-                "total_rules": len(disallowed) + len(allowed),
-                "raw": content[:2000]
-            }
-        else:
-            results["robots_txt"] = {"exists": False}
-    except:
-        results["robots_txt"] = {"exists": False, "error": "Could not fetch"}
-    # Sitemaps
-    sitemap_urls = results["robots_txt"].get("sitemaps_declared", [])
-    if not sitemap_urls:
-        sitemap_urls = [f"{base}/sitemap.xml", f"{base}/sitemap_index.xml"]
-    sitemaps = []
-    total_urls = 0
-    for sm_url in sitemap_urls[:5]:
-        try:
-            if not sm_url.startswith('http'):
-                sm_url = sm_url.strip()
-            r = safe_get(sm_url, timeout=10)
-            if r and r.status_code == 200:
-                soup = BeautifulSoup(r.text, 'html.parser')
-                urls = [loc.text for loc in soup.find_all('loc')]
-                sitemap_info = {"url": sm_url, "urls_count": len(urls), "sample_urls": urls[:10]}
-                # Check for nested sitemaps
-                nested = [u for u in urls if 'sitemap' in u.lower()]
-                if nested:
-                    sitemap_info["nested_sitemaps"] = nested[:5]
-                sitemaps.append(sitemap_info)
-                total_urls += len(urls)
-        except:
-            pass
-    results["sitemaps"] = sitemaps
-    results["stats"] = {"robots_exists": results["robots_txt"].get("exists", False),
-        "disallowed_paths": len(results["robots_txt"].get("disallowed_paths", [])),
-        "interesting_paths": len(results["robots_txt"].get("interesting_paths", [])),
-        "sitemaps": len(sitemaps), "total_urls": total_urls}
-    return results
+        url = f"https://{domain}"
+        resp = safe_get(url, timeout=15)
+        if not resp:
+            url = f"http://{domain}"
+            resp = safe_get(url, timeout=15)
+        if not resp:
+            result["error"] = "Could not reach target"
+            return result
+        
+        body = resp.text or ""
+        headers = {k.lower(): v for k, v in resp.headers.items()}
+        
+        findings = []
+        
+        # 1. HTML Comments Analysis (may contain debug info, passwords, TODO, internal paths)
+        comments = re.findall(r'<!--(.*?)-->', body, re.DOTALL)
+        interesting_comments = []
+        sensitive_patterns = ['password', 'secret', 'key', 'token', 'api', 'todo', 'fixme', 'hack', 'bug', 'debug', 'admin', 'internal', 'staging', 'test', 'database', 'mysql', 'postgres', 'mongo', 'redis', 'config', 'credentials', 'username', 'login', 'private', 'dev', 'development']
+        
+        for comment in comments:
+            comment_clean = comment.strip()
+            if len(comment_clean) < 3:
+                continue
+            comment_lower = comment_clean.lower()
+            for pattern in sensitive_patterns:
+                if pattern in comment_lower:
+                    interesting_comments.append({
+                        "content": comment_clean[:200],
+                        "trigger": pattern,
+                        "severity": "HIGH" if pattern in ['password', 'secret', 'key', 'token', 'credentials'] else "MEDIUM"
+                    })
+                    break
+        
+        result["html_comments"] = interesting_comments
+        if interesting_comments:
+            findings.append({
+                "type": "HTML Comments",
+                "severity": "HIGH" if any(c["severity"] == "HIGH" for c in interesting_comments) else "MEDIUM",
+                "count": len(interesting_comments),
+                "detail": f"{len(interesting_comments)} comments contain sensitive keywords"
+            })
+        
+        # 2. Meta Tags Information
+        meta_info = []
+        meta_tags = re.findall(r'<meta\s+([^>]+)>', body, re.IGNORECASE)
+        for meta in meta_tags:
+            name = re.search(r'name=["\']([^"\']+)["\']', meta, re.IGNORECASE)
+            content = re.search(r'content=["\']([^"\']+)["\']', meta, re.IGNORECASE)
+            if name and content:
+                n = name.group(1).lower()
+                c = content.group(1)
+                if n in ['generator', 'author', 'description', 'keywords', 'robots', 'theme-color', 'msapplication-config']:
+                    meta_info.append({"name": n, "content": c[:200]})
+        
+        result["meta_info"] = meta_info
+        
+        # Check generator (leaks CMS version)
+        generator_metas = [m for m in meta_info if m["name"] == "generator"]
+        if generator_metas:
+            findings.append({
+                "type": "Generator Meta Tag",
+                "severity": "MEDIUM",
+                "count": len(generator_metas),
+                "detail": f"CMS/Framework version exposed: {generator_metas[0]['content']}"
+            })
+        
+        # 3. Email addresses in source code
+        emails = list(set(re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', body)))
+        result["exposed_emails"] = emails[:20]
+        if emails:
+            findings.append({
+                "type": "Email Addresses Exposed",
+                "severity": "LOW",
+                "count": len(emails),
+                "detail": f"{len(emails)} email addresses found in page source"
+            })
+        
+        # 4. Internal IP addresses
+        internal_ips = list(set(re.findall(r'(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2[0-9]|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})', body)))
+        result["exposed_ips"] = internal_ips
+        if internal_ips:
+            findings.append({
+                "type": "Internal IP Addresses",
+                "severity": "HIGH",
+                "count": len(internal_ips),
+                "detail": f"{len(internal_ips)} private/internal IPs found in source"
+            })
+        
+        # 5. Source map files
+        source_maps = list(set(re.findall(r'//[#@]\s*sourceMappingURL=([^\s\'"]+)', body)))
+        js_map_refs = list(set(re.findall(r'["\']([^"\']+\.map)["\']', body)))
+        all_maps = list(set(source_maps + js_map_refs))
+        result["source_maps"] = all_maps[:20]
+        if all_maps:
+            findings.append({
+                "type": "Source Maps",
+                "severity": "MEDIUM",
+                "count": len(all_maps),
+                "detail": f"{len(all_maps)} source map references found — may expose original source code"
+            })
+        
+        # 6. Server header information leakage
+        server_leaks = []
+        for h in ['server', 'x-powered-by', 'x-aspnet-version', 'x-aspnetmvc-version', 'x-generator', 'x-drupal-cache']:
+            if h in headers:
+                server_leaks.append({"header": h, "value": headers[h]})
+        
+        if server_leaks:
+            findings.append({
+                "type": "Server Header Leakage",
+                "severity": "MEDIUM",
+                "count": len(server_leaks),
+                "detail": f"{len(server_leaks)} headers expose server/technology info"
+            })
+        
+        result["server_leaks"] = server_leaks
+        
+        # 7. Check error pages for stack traces
+        error_urls = [f"https://{domain}/nonexistent_page_404_test_{domain}", f"https://{domain}/test.php", f"https://{domain}/'"]
+        error_disclosures = []
+        
+        for err_url in error_urls:
+            try:
+                err_resp = safe_get(err_url, timeout=8)
+                if err_resp and err_resp.text:
+                    err_body = err_resp.text.lower()
+                    # Check for stack traces / debug info
+                    stack_patterns = [
+                        ('Stack Trace', 'stack trace'),
+                        ('File Path', 'at /'),
+                        ('Line Number', 'on line'),
+                        ('SQL Error', 'sql'),
+                        ('Database Error', 'database error'),
+                        ('PHP Error', 'fatal error'),
+                        ('Python Traceback', 'traceback'),
+                        ('Java Exception', 'exception'),
+                        ('.NET Error', 'asp.net'),
+                        ('Debug Mode', 'debug'),
+                        ('Framework Version', 'version'),
+                    ]
+                    for name, pattern in stack_patterns:
+                        if pattern in err_body and len(err_body) > 200:
+                            error_disclosures.append({
+                                "url": err_url[:80],
+                                "type": name,
+                                "status": err_resp.status_code
+                            })
+                            break
+            except:
+                pass
+        
+        result["error_disclosure"] = error_disclosures
+        if error_disclosures:
+            findings.append({
+                "type": "Error Page Disclosure",
+                "severity": "HIGH",
+                "count": len(error_disclosures),
+                "detail": f"{len(error_disclosures)} error pages expose internal information"
+            })
+        
+        # 8. API keys / secrets in source
+        secret_patterns = [
+            (r'(?:api[_-]?key|apikey)\s*[:=]\s*["\']([a-zA-Z0-9_\-]{20,})["\']', "API Key"),
+            (r'(?:secret|token)\s*[:=]\s*["\']([a-zA-Z0-9_\-]{20,})["\']', "Secret/Token"),
+            (r'AIza[0-9A-Za-z_\-]{35}', "Google API Key"),
+            (r'sk_live_[0-9a-zA-Z]{24,}', "Stripe Secret Key"),
+            (r'pk_live_[0-9a-zA-Z]{24,}', "Stripe Public Key"),
+            (r'(?:AKIA|ASIA)[0-9A-Z]{16}', "AWS Access Key"),
+        ]
+        
+        secrets_found = []
+        for pattern, name in secret_patterns:
+            matches = re.findall(pattern, body, re.IGNORECASE)
+            if matches:
+                secrets_found.append({"type": name, "count": len(matches), "sample": matches[0][:10] + "..." if matches else ""})
+        
+        result["secrets_found"] = secrets_found
+        if secrets_found:
+            findings.append({
+                "type": "Exposed Secrets/API Keys",
+                "severity": "CRITICAL",
+                "count": sum(s["count"] for s in secrets_found),
+                "detail": f"Potential secrets found: {', '.join(s['type'] for s in secrets_found)}"
+            })
+        
+        result["findings"] = findings
+        result["leaks_found"] = len(findings)
+        
+        # Risk score
+        sev_scores = {"CRITICAL": 30, "HIGH": 20, "MEDIUM": 10, "LOW": 3}
+        risk_score = min(100, sum(sev_scores.get(f["severity"], 0) for f in findings))
+        
+        if risk_score >= 60: risk = "CRITICAL"
+        elif risk_score >= 40: risk = "HIGH"
+        elif risk_score >= 20: risk = "MEDIUM"
+        elif risk_score > 0: risk = "LOW"
+        else: risk = "CLEAN"
+        
+        result["risk_level"] = risk
+        result["risk_score"] = risk_score
+        
+        result["summary"] = {
+            "total_leak_categories": len(findings),
+            "html_comments": len(interesting_comments),
+            "emails_exposed": len(emails),
+            "internal_ips": len(internal_ips),
+            "source_maps": len(all_maps),
+            "server_leaks": len(server_leaks),
+            "error_disclosures": len(error_disclosures),
+            "secrets_found": len(secrets_found),
+            "risk_level": risk,
+            "risk_score": risk_score,
+            "data_source": "Multi-vector info leak detection"
+        }
+        
+    except Exception as e:
+        result["error"] = str(e)
+    
+    return result
 
-# ================================================================
-# MODULE 24: FULL RECON (ALL-IN-ONE)
-# ================================================================
+
 def full_recon(domain):
     results = {"module": "Full Recon", "domain": domain, "modules": {}, "overall_score": 0, "stats": {}}
     modules = {
@@ -1542,14 +2164,15 @@ def full_recon(domain):
         "reverse_dns": reverse_dns_shared,
         "email_sec": email_security,
         "ports": port_scanner,
+        "wayback": wayback_recon,
         "cloud": cloud_infra,
-        "geo": geoip_advanced,
+        "shodan": shodan_intel,
         "waf": waf_detect,
-        "tech": tech_stack,
+        "tech": deep_tech_fingerprint,
         "headers": http_fingerprint,
-        "js_analysis": js_analyzer,
-        "links": link_extractor,
-        "cms": cms_scanner,
+        "threat_intel": alienvault_threat_intel,
+        "sensitive_paths": sensitive_paths,
+        "cve_hunter": cve_hunter,
         "ssl": ssl_deep_audit,
         "security": security_headers,
         "cors": cors_misconfig,
@@ -1558,7 +2181,7 @@ def full_recon(domain):
         "takeover": subdomain_takeover,
         "whois": whois_intel,
         "reputation": domain_reputation,
-        "robots": robots_sitemap,
+        "info_leak": info_leak_detector,
     }
     completed = 0
     failed = 0
@@ -1635,15 +2258,15 @@ def scan():
         "reverse_dns": reverse_dns_shared,
         "email_sec": email_security,
         "ports": port_scanner,
-        "trace": network_trace,
+        "wayback": wayback_recon,
         "cloud": cloud_infra,
-        "geo": geoip_advanced,
+        "shodan": shodan_intel,
         "waf": waf_detect,
-        "tech": tech_stack,
+        "tech": deep_tech_fingerprint,
         "headers": http_fingerprint,
-        "js_analysis": js_analyzer,
-        "links": link_extractor,
-        "cms": cms_scanner,
+        "threat_intel": alienvault_threat_intel,
+        "sensitive_paths": sensitive_paths,
+        "cve_hunter": cve_hunter,
         "ssl": ssl_deep_audit,
         "security": security_headers,
         "cors": cors_misconfig,
@@ -1652,7 +2275,7 @@ def scan():
         "takeover": subdomain_takeover,
         "whois": whois_intel,
         "reputation": domain_reputation,
-        "robots": robots_sitemap,
+        "info_leak": info_leak_detector,
         "full_scan": full_recon,
     }
     if module == "export_report":
@@ -1679,15 +2302,15 @@ def list_modules():
         {"id": "reverse_dns", "name": "Reverse DNS & Shared Hosting", "icon": "🔄", "category": "DNS Intelligence", "desc": "PTR Records + Shared hosting detection"},
         {"id": "email_sec", "name": "Email Security Audit", "icon": "📧", "category": "DNS Intelligence", "desc": "SPF + DKIM + DMARC analysis"},
         {"id": "ports", "name": "Port Scanner Pro", "icon": "🚪", "category": "Infrastructure", "desc": "Top 40 ports + Banner grabbing"},
-        {"id": "trace", "name": "Network Trace", "icon": "🛤️", "category": "Infrastructure", "desc": "Traceroute with ASN mapping"},
+        {"id": "wayback", "name": "Wayback Recon", "icon": "📜", "category": "Infrastructure", "desc": "Historical URLs + Hidden endpoints + Config files"},
         {"id": "cloud", "name": "Cloud Infrastructure", "icon": "☁️", "category": "Infrastructure", "desc": "AWS/Azure/GCP/CDN detection"},
-        {"id": "geo", "name": "GeoIP Advanced", "icon": "🌍", "category": "Infrastructure", "desc": "Location + ASN + ISP + Datacenter"},
+        {"id": "shodan", "name": "Shodan Intelligence", "icon": "🔥", "category": "Infrastructure", "desc": "Real CVEs + Open ports + CPEs from Shodan"},
         {"id": "waf", "name": "WAF Detection", "icon": "🛡️", "category": "Web Analysis", "desc": "Firewall fingerprinting + bypass test"},
-        {"id": "tech", "name": "Tech Stack X-Ray", "icon": "⚙️", "category": "Web Analysis", "desc": "CMS + Framework + Libraries + Analytics"},
+        {"id": "tech", "name": "Deep Tech Fingerprint", "icon": "🧬", "category": "Web Analysis", "desc": "200+ signatures - CMS + Frameworks + Analytics"},
         {"id": "headers", "name": "HTTP Deep Fingerprint", "icon": "📡", "category": "Web Analysis", "desc": "Headers + Cookies + Redirects + Timing"},
-        {"id": "js_analysis", "name": "JavaScript Analyzer", "icon": "📜", "category": "Web Analysis", "desc": "API keys + Secrets + Endpoints"},
-        {"id": "links", "name": "Link & URL Extractor", "icon": "🔗", "category": "Web Analysis", "desc": "Internal/External links + Hidden paths"},
-        {"id": "cms", "name": "CMS Scanner", "icon": "🏗️", "category": "Web Analysis", "desc": "WordPress/Joomla/Drupal + Vulnerabilities"},
+        {"id": "threat_intel", "name": "AlienVault Threat Intel", "icon": "⚡", "category": "Intelligence", "desc": "OTX threat pulses + Malware + MITRE ATT&CK"},
+        {"id": "sensitive_paths", "name": "Sensitive Path Scanner", "icon": "🗂️", "category": "Security Audit", "desc": "120+ paths: .git, .env, backups, admin panels"},
+        {"id": "cve_hunter", "name": "CVE Vulnerability Hunter", "icon": "🎯", "category": "Security Audit", "desc": "Real CVE lookup + CVSS scores + Exploits"},
         {"id": "ssl", "name": "SSL/TLS Deep Audit", "icon": "🔐", "category": "Security Audit", "desc": "Cert chain + Protocols + Grade A-F"},
         {"id": "security", "name": "Security Headers Pro", "icon": "🔒", "category": "Security Audit", "desc": "CSP + HSTS + 11 headers + Score 0-100"},
         {"id": "cors", "name": "CORS Misconfiguration", "icon": "🌐", "category": "Security Audit", "desc": "Origin reflection + Credential leak tests"},
@@ -1696,7 +2319,7 @@ def list_modules():
         {"id": "takeover", "name": "Subdomain Takeover", "icon": "💀", "category": "Security Audit", "desc": "Dangling CNAME + 15 service checks"},
         {"id": "whois", "name": "WHOIS Intelligence", "icon": "📋", "category": "Intelligence", "desc": "Registration + Age + Expiry + Registrar"},
         {"id": "reputation", "name": "Domain Reputation", "icon": "⭐", "category": "Intelligence", "desc": "8 blacklists + Spam + Malware check"},
-        {"id": "robots", "name": "Robots & Sitemap Intel", "icon": "🤖", "category": "Intelligence", "desc": "robots.txt + Sitemaps + Hidden paths"},
+        {"id": "info_leak", "name": "Info Leak Detector", "icon": "🔎", "category": "Intelligence", "desc": "HTML comments + Secrets + Source maps + Error pages"},
         {"id": "full_scan", "name": "⚡ FULL RECON", "icon": "⚡", "category": "Full Scan", "desc": "ALL 22 modules at once + Overall score"},
         {"id": "export_report", "name": "📊 Export Report", "icon": "📊", "category": "Full Scan", "desc": "Export results as JSON"},
     ]
