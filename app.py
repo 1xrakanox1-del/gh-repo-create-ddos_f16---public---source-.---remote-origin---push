@@ -1537,28 +1537,28 @@ def robots_sitemap(domain):
 def full_recon(domain):
     results = {"module": "Full Recon", "domain": domain, "modules": {}, "overall_score": 0, "stats": {}}
     modules = {
-        "dns_recon": dns_full_recon,
+        "dns": dns_full_recon,
         "subdomains": subdomain_hunter,
         "reverse_dns": reverse_dns_shared,
-        "email_security": email_security,
-        "port_scan": port_scanner,
-        "cloud_infra": cloud_infra,
-        "geoip": geoip_advanced,
-        "waf_detect": waf_detect,
-        "tech_stack": tech_stack,
-        "http_fingerprint": http_fingerprint,
-        "js_analyzer": js_analyzer,
-        "link_extractor": link_extractor,
-        "cms_scanner": cms_scanner,
-        "ssl_audit": ssl_deep_audit,
-        "security_headers": security_headers,
-        "cors_check": cors_misconfig,
-        "open_redirect": open_redirect,
-        "cookie_analyzer": cookie_analyzer,
-        "subdomain_takeover": subdomain_takeover,
+        "email_sec": email_security,
+        "ports": port_scanner,
+        "cloud": cloud_infra,
+        "geo": geoip_advanced,
+        "waf": waf_detect,
+        "tech": tech_stack,
+        "headers": http_fingerprint,
+        "js_analysis": js_analyzer,
+        "links": link_extractor,
+        "cms": cms_scanner,
+        "ssl": ssl_deep_audit,
+        "security": security_headers,
+        "cors": cors_misconfig,
+        "redirect": open_redirect,
+        "cookies": cookie_analyzer,
+        "takeover": subdomain_takeover,
         "whois": whois_intel,
         "reputation": domain_reputation,
-        "robots_sitemap": robots_sitemap,
+        "robots": robots_sitemap,
     }
     completed = 0
     failed = 0
@@ -1574,14 +1574,14 @@ def full_recon(domain):
                 failed += 1
     # Calculate overall score
     scores = []
-    if "ssl_audit" in results["modules"] and "score" in results["modules"]["ssl_audit"]:
-        scores.append(results["modules"]["ssl_audit"]["score"])
-    if "security_headers" in results["modules"] and "score" in results["modules"]["security_headers"]:
-        scores.append(results["modules"]["security_headers"]["score"])
-    if "email_security" in results["modules"] and "score" in results["modules"]["email_security"]:
-        scores.append(results["modules"]["email_security"]["score"])
-    if "cookie_analyzer" in results["modules"] and "score" in results["modules"]["cookie_analyzer"]:
-        scores.append(results["modules"]["cookie_analyzer"]["score"])
+    if "ssl" in results["modules"] and "score" in results["modules"]["ssl"]:
+        scores.append(results["modules"]["ssl"]["score"])
+    if "security" in results["modules"] and "score" in results["modules"]["security"]:
+        scores.append(results["modules"]["security"]["score"])
+    if "email_sec" in results["modules"] and "score" in results["modules"]["email_sec"]:
+        scores.append(results["modules"]["email_sec"]["score"])
+    if "cookies" in results["modules"] and "score" in results["modules"]["cookies"]:
+        scores.append(results["modules"]["cookies"]["score"])
     if "reputation" in results["modules"] and "score" in results["modules"]["reputation"]:
         scores.append(results["modules"]["reputation"]["score"])
     overall = round(sum(scores) / len(scores)) if scores else 0
@@ -1629,30 +1629,31 @@ def scan():
     if not domain:
         return jsonify({"error": "Invalid domain"}), 400
     module_map = {
-        "dns_recon": dns_full_recon,
-        "subdomain_hunter": subdomain_hunter,
+        # JS ID → Python function (matching frontend module IDs)
+        "dns": dns_full_recon,
+        "subdomains": subdomain_hunter,
         "reverse_dns": reverse_dns_shared,
-        "email_security": email_security,
-        "port_scanner": port_scanner,
-        "network_trace": network_trace,
-        "cloud_infra": cloud_infra,
-        "geoip": geoip_advanced,
-        "waf_detect": waf_detect,
-        "tech_stack": tech_stack,
-        "http_fingerprint": http_fingerprint,
-        "js_analyzer": js_analyzer,
-        "link_extractor": link_extractor,
-        "cms_scanner": cms_scanner,
-        "ssl_audit": ssl_deep_audit,
-        "security_headers": security_headers,
-        "cors_misconfig": cors_misconfig,
-        "open_redirect": open_redirect,
-        "cookie_analyzer": cookie_analyzer,
-        "subdomain_takeover": subdomain_takeover,
-        "whois_intel": whois_intel,
-        "domain_reputation": domain_reputation,
-        "robots_sitemap": robots_sitemap,
-        "full_recon": full_recon,
+        "email_sec": email_security,
+        "ports": port_scanner,
+        "trace": network_trace,
+        "cloud": cloud_infra,
+        "geo": geoip_advanced,
+        "waf": waf_detect,
+        "tech": tech_stack,
+        "headers": http_fingerprint,
+        "js_analysis": js_analyzer,
+        "links": link_extractor,
+        "cms": cms_scanner,
+        "ssl": ssl_deep_audit,
+        "security": security_headers,
+        "cors": cors_misconfig,
+        "redirect": open_redirect,
+        "cookies": cookie_analyzer,
+        "takeover": subdomain_takeover,
+        "whois": whois_intel,
+        "reputation": domain_reputation,
+        "robots": robots_sitemap,
+        "full_scan": full_recon,
     }
     if module == "export_report":
         scan_data = data.get('scan_data', {})
